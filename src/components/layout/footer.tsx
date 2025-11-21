@@ -1,0 +1,149 @@
+'use client'
+
+import Link from 'next/link'
+import { useSettings } from '@/contexts/SettingsContext'
+import { useState, useEffect } from 'react'
+
+function FooterContent() {
+  const { settings } = useSettings()
+  const [categories, setCategories] = useState<any[]>([])
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch('/api/categories/public')
+        const result = await response.json()
+        if (result.success) {
+          const parentCategories = result.data.filter((category: any) => !category.parent)
+          setCategories(parentCategories.slice(0, 4)) // Limit to 4 categories
+        }
+      } catch (error) {
+        console.error('Error fetching footer categories:', error)
+      }
+    }
+
+    fetchCategories()
+  }, [])
+  
+  return (
+    <footer className="border-t bg-background">
+      <div className="container py-12">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+          {/* Brand */}
+          <div className="space-y-4">
+            <Link href="/" className="flex items-center space-x-2">
+              {settings?.logo?.value && typeof settings.logo.value === 'string' ? (
+                <img 
+                  src={settings.logo.value.startsWith('/media/') ? `http://localhost:8000${settings.logo.value}` : settings.logo.value} 
+                  alt={settings.site_name?.value || 'Logo'} 
+                  className="h-8 w-8 rounded object-contain"
+                />
+              ) : (
+                <div className="h-8 w-8 rounded bg-primary"></div>
+              )}
+              <span className="text-xl font-bold">
+                {settings?.site_name?.value || 'Hardware Review'}
+              </span>
+            </Link>
+            <p className="text-sm text-muted-foreground">
+              {settings?.site_description?.value || 'Donanım incelemeleri, karşılaştırmaları ve rehberleri ile en doğru seçimi yapın.'}
+            </p>
+          </div>
+
+          {/* İçerikler */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold">İçerikler</h3>
+            <ul className="space-y-2 text-sm">
+              <li>
+                <Link href="/reviews" className="text-muted-foreground hover:text-primary">
+                  İncelemeler
+                </Link>
+              </li>
+              <li>
+                <Link href="/best" className="text-muted-foreground hover:text-primary">
+                  En İyi Listeler
+                </Link>
+              </li>
+              <li>
+                <Link href="/compare" className="text-muted-foreground hover:text-primary">
+                  Karşılaştırmalar
+                </Link>
+              </li>
+              <li>
+                <Link href="/guides" className="text-muted-foreground hover:text-primary">
+                  Rehberler
+                </Link>
+              </li>
+              <li>
+                <Link href="/news" className="text-muted-foreground hover:text-primary">
+                  Haberler
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Kategoriler */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold">Kategoriler</h3>
+            <ul className="space-y-2 text-sm">
+              {categories.map((category) => (
+                <li key={category.id}>
+                  <Link href={`/category/${category.slug}`} className="text-muted-foreground hover:text-primary">
+                    {category.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Yasal */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold">Yasal</h3>
+            <ul className="space-y-2 text-sm">
+              <li>
+                <Link href="/privacy" className="text-muted-foreground hover:text-primary">
+                  Gizlilik Politikası
+                </Link>
+              </li>
+              <li>
+                <Link href="/terms" className="text-muted-foreground hover:text-primary">
+                  Kullanım Şartları
+                </Link>
+              </li>
+              <li>
+                <Link href="/cookies" className="text-muted-foreground hover:text-primary">
+                  Çerez Politikası
+                </Link>
+              </li>
+              <li>
+                <Link href="/affiliate" className="text-muted-foreground hover:text-primary">
+                  Affiliate Açıklaması
+                </Link>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="mt-8 pt-8 border-t">
+          <div className="flex flex-col md:flex-row justify-between items-center">
+            <p className="text-sm text-muted-foreground">
+              © 2024 Donanım Puanı. Tüm hakları saklıdır.
+            </p>
+            <div className="flex items-center space-x-4 mt-4 md:mt-0">
+              <Link href="/rss" className="text-sm text-muted-foreground hover:text-primary">
+                RSS
+              </Link>
+              <Link href="/sitemap.xml" className="text-sm text-muted-foreground hover:text-primary">
+                Sitemap
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    </footer>
+  )
+}
+
+export function Footer() {
+  return <FooterContent />
+}

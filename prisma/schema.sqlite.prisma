@@ -1,0 +1,238 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  password      String?
+  emailVerified DateTime?
+  image         String?
+  role          String    @default("VISITOR")
+  avatar        String?
+  bio           String?
+  socialLinks   String?   // JSON string instead of Json type
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  authoredArticles Article[] @relation("ArticleAuthor")
+  editedArticles   Article[] @relation("ArticleEditor")
+  comments      Comment[]
+  notifications Notification[]
+  outboundClicks OutboundClick[]
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Category {
+  id       String  @id @default(cuid())
+  parentId String?
+  slug     String  @unique
+  name     String
+  parent   Category?  @relation("CategoryChildren", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryChildren")
+  articles Article[]
+}
+
+model Tag {
+  id    String @id @default(cuid())
+  slug  String @unique
+  name  String
+  type  String @default("GENERAL")
+  
+  articleTags ArticleTag[]
+}
+
+model Product {
+  id         String   @id @default(cuid())
+  brand      String
+  model      String
+  slug       String   @unique
+  specs      String?  // JSON string instead of Json type
+  releaseYear Int?
+  coverImage String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  articleProducts ArticleProduct[]
+  affiliateLinks  AffiliateLink[]
+  outboundClicks  OutboundClick[]
+}
+
+model Article {
+  id          String        @id @default(cuid())
+  type        String        @default("REVIEW")
+  slug        String        @unique
+  title       String
+  subtitle    String?
+  excerpt     String?
+  content     String?       // JSON string instead of Json type
+  status      String        @default("DRAFT")
+  authorId    String
+  editorId    String?
+  publishedAt DateTime?
+  heroImage   String?
+  ogImage     String?
+  metaTitle   String?
+  metaDescription String?
+  canonical   String?
+  schemaType  String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  author      User           @relation("ArticleAuthor", fields: [authorId], references: [id])
+  editor      User?          @relation("ArticleEditor", fields: [editorId], references: [id])
+  category    Category?      @relation(fields: [categoryId], references: [id])
+  categoryId  String?
+  
+  articleTags    ArticleTag[]
+  articleProducts ArticleProduct[]
+  comments       Comment[]
+  outboundClicks OutboundClick[]
+  
+  reviewExtra ReviewExtra?
+  compareExtra CompareExtra?
+}
+
+model ArticleTag {
+  id        String   @id @default(cuid())
+  articleId String
+  tagId     String
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, tagId])
+}
+
+model ArticleProduct {
+  id        String  @id @default(cuid())
+  articleId String
+  productId String
+  position  Int?
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, productId])
+}
+
+model ReviewExtra {
+  reviewId      String @id
+  criteria      String // JSON string instead of Json type
+  scoreNumeric  Float
+  pros          String // JSON string instead of Json type
+  cons          String // JSON string instead of Json type
+  technicalSpec String? // JSON string instead of Json type
+  
+  review        Article @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+}
+
+model CompareExtra {
+  compareId        String @id
+  leftProductId    String
+  rightProductId   String
+  rounds           String // JSON string instead of Json type
+  winnerProductId  String?
+  
+  compare          Article @relation(fields: [compareId], references: [id], onDelete: Cascade)
+}
+
+model AffiliateLink {
+  id           String  @id @default(cuid())
+  productId    String
+  merchant     String
+  urlTemplate  String
+  active       Boolean @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  product      Product        @relation(fields: [productId], references: [id])
+}
+
+model OutboundClick {
+  id        String   @id @default(cuid())
+  productId String?
+  merchant  String
+  articleId String?
+  userId    String?
+  ip        String
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  product   Product? @relation(fields: [productId], references: [id])
+  article   Article? @relation(fields: [articleId], references: [id])
+  user      User?    @relation(fields: [userId], references: [id])
+}
+
+model Comment {
+  id        String        @id @default(cuid())
+  articleId String
+  userId    String
+  content   String
+  status    String        @default("PENDING")
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      String
+  payload   String?          // JSON string instead of Json type
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Setting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+}

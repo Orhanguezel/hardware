@@ -1,0 +1,392 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  password      String?
+  emailVerified DateTime?
+  image         String?
+  role          String    @default("VISITOR")
+  avatar        String?
+  bio           String?
+  socialLinks   String?   // JSON string instead of Json type
+  settings      String?   // JSON string for user settings
+  status        String    @default("ACTIVE") // ACTIVE, INACTIVE, BANNED
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  authoredArticles Article[] @relation("ArticleAuthor")
+  editedArticles   Article[] @relation("ArticleEditor")
+  comments      Comment[]
+  notifications Notification[]
+  favorites     Favorite[]
+  outboundClicks OutboundClick[]
+  helpfulVotes  HelpfulVote[]
+  userReviews   UserReview[]
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Category {
+  id       String  @id @default(cuid())
+  parentId String?
+  slug     String  @unique
+  name     String
+  description String?
+  icon     String?
+  color    String?
+  isActive Boolean @default(true)
+  sortOrder Int    @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  parent   Category?  @relation("CategoryChildren", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryChildren")
+  articles Article[]
+  products Product[]
+}
+
+model Tag {
+  id    String @id @default(cuid())
+  slug  String @unique
+  name  String
+  type  String @default("GENERAL")
+  
+  articleTags ArticleTag[]
+  productTags ProductTag[]
+}
+
+model Product {
+  id         String   @id @default(cuid())
+  brand      String
+  model      String
+  slug       String   @unique
+  specs      String?  // JSON string instead of Json type
+  releaseYear Int?
+  coverImage String?
+  description String?
+  categoryId String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  category       Category?      @relation(fields: [categoryId], references: [id])
+  articleProducts ArticleProduct[]
+  affiliateLinks  AffiliateLink[]
+  outboundClicks  OutboundClick[]
+  productSpecs   ProductSpec[]
+  priceHistory   PriceHistory[]
+  userReviews    UserReview[]
+  productTags    ProductTag[]
+  leftComparisons  ProductComparison[] @relation("LeftComparison")
+  rightComparisons ProductComparison[] @relation("RightComparison")
+  favorites      Favorite[]
+}
+
+model Article {
+  id          String        @id @default(cuid())
+  type        String        @default("REVIEW")
+  slug        String        @unique
+  title       String
+  subtitle    String?
+  excerpt     String?
+  content     String?       // JSON string instead of Json type
+  status      String        @default("DRAFT")
+  authorId    String
+  editorId    String?
+  publishedAt DateTime?
+  heroImage   String?
+  ogImage     String?
+  metaTitle   String?
+  metaDescription String?
+  canonical   String?
+  schemaType  String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  author      User           @relation("ArticleAuthor", fields: [authorId], references: [id])
+  editor      User?          @relation("ArticleEditor", fields: [editorId], references: [id])
+  category    Category?      @relation(fields: [categoryId], references: [id])
+  categoryId  String?
+  
+  articleTags    ArticleTag[]
+  articleProducts ArticleProduct[]
+  comments       Comment[]
+  outboundClicks OutboundClick[]
+  
+  reviewExtra ReviewExtra?
+  compareExtra CompareExtra?
+}
+
+model ArticleTag {
+  id        String   @id @default(cuid())
+  articleId String
+  tagId     String
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, tagId])
+}
+
+model ArticleProduct {
+  id        String  @id @default(cuid())
+  articleId String
+  productId String
+  position  Int?
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, productId])
+}
+
+model ReviewExtra {
+  id               String @id @default(cuid())
+  articleId        String @unique
+  criteria         String? // JSON string instead of Json type
+  scoreNumeric     Float?
+  pros             String? // JSON string instead of Json type
+  cons             String? // JSON string instead of Json type
+  technicalSpec    String? // JSON string instead of Json type
+  performanceScore Float?
+  stabilityScore   Float?
+  coverageScore    Float?
+  softwareScore    Float?
+  valueScore       Float?
+  totalScore       Float?
+  
+  article        Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+}
+
+model CompareExtra {
+  compareId        String @id
+  leftProductId    String
+  rightProductId   String
+  rounds           String // JSON string instead of Json type
+  winnerProductId  String?
+  
+  compare          Article @relation(fields: [compareId], references: [id], onDelete: Cascade)
+}
+
+model AffiliateLink {
+  id           String  @id @default(cuid())
+  productId    String
+  merchant     String
+  urlTemplate  String
+  active       Boolean @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  product      Product        @relation(fields: [productId], references: [id])
+}
+
+model OutboundClick {
+  id        String   @id @default(cuid())
+  productId String?
+  merchant  String
+  articleId String?
+  userId    String?
+  ip        String
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  product   Product? @relation(fields: [productId], references: [id])
+  article   Article? @relation(fields: [articleId], references: [id])
+  user      User?    @relation(fields: [userId], references: [id])
+}
+
+model Comment {
+  id          String        @id @default(cuid())
+  articleId   String
+  userId      String?
+  content     String
+  status      String        @default("PENDING")
+  authorName  String?
+  authorEmail String?
+  ipAddress   String?
+  parentId    String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  user      User?    @relation(fields: [userId], references: [id])
+  parent    Comment? @relation("CommentReplies", fields: [parentId], references: [id])
+  replies   Comment[] @relation("CommentReplies")
+  helpfulVotes HelpfulVote[]
+}
+
+model HelpfulVote {
+  id        String   @id @default(cuid())
+  commentId String
+  userId    String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id])
+
+  @@unique([commentId, userId])
+  @@unique([commentId, ipAddress])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      String
+  payload   String?          // JSON string instead of Json type
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Setting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+}
+
+model ProductSpec {
+  id        String  @id @default(cuid())
+  productId String
+  name      String
+  value     String
+  type      String  @default("TEXT") // TEXT, NUMBER, BOOLEAN, SELECT
+  unit      String?
+  isVisible Boolean @default(true)
+  sortOrder Int     @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, name])
+}
+
+model PriceHistory {
+  id        String   @id @default(cuid())
+  productId String
+  price     Float
+  currency  String   @default("TRY")
+  source    String   // Merchant name or source
+  url       String?
+  recordedAt DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, recordedAt])
+}
+
+model UserReview {
+  id        String   @id @default(cuid())
+  productId String
+  userId    String
+  rating    Int      // 1-5 stars
+  title     String?
+  content   String
+  pros      String?  // JSON string
+  cons      String?  // JSON string
+  isVerified Boolean @default(false)
+  isHelpful  Int     @default(0)
+  status    String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, userId])
+  @@index([productId, rating])
+  @@index([status])
+}
+
+model ProductTag {
+  id        String @id @default(cuid())
+  productId String
+  tagId     String
+  createdAt DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tag     Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, tagId])
+}
+
+model ProductComparison {
+  id          String  @id @default(cuid())
+  leftProductId String
+  rightProductId String
+  title       String
+  description String?
+  features    String  // JSON string - comparison features
+  winner      String? // leftProductId or rightProductId
+  isPublic    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  leftProduct  Product @relation("LeftComparison", fields: [leftProductId], references: [id])
+  rightProduct Product @relation("RightComparison", fields: [rightProductId], references: [id])
+
+  @@index([leftProductId])
+  @@index([rightProductId])
+  @@index([isPublic])
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([userId])
+  @@index([productId])
+}

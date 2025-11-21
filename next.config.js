@@ -1,0 +1,18 @@
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  serverExternalPackages: ['@prisma/client'],
+  images: {
+    domains: ['localhost', 'images.unsplash.com'],
+    formats: ['image/webp', 'image/avif'],
+  },
+  async rewrites() {
+    return [
+      {
+        source: '/sitemap.xml',
+        destination: '/api/sitemaps',
+      },
+    ]
+  },
+}
+
+module.exports = nextConfig
