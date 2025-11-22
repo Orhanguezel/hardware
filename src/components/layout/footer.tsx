@@ -12,10 +12,14 @@ function FooterContent() {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await fetch('/api/categories/public')
+        // 🔁 ESKİ: /api/categories/public  (artık yok)
+        const response = await fetch('/api/categories')
         const result = await response.json()
-        if (result.success) {
-          const parentCategories = result.data.filter((category: unknown) => !(category as { parent?: unknown }).parent)
+
+        if (result.success && Array.isArray(result.data)) {
+          const parentCategories = result.data.filter(
+            (category: unknown) => !(category as { parent?: unknown }).parent,
+          )
           setCategories(parentCategories.slice(0, 4)) // Limit to 4 categories
         }
       } catch (error) {
@@ -25,7 +29,21 @@ function FooterContent() {
 
     fetchCategories()
   }, [])
-  
+
+  // Logo + site adı için helper
+  const logoValue =
+    settings?.logo && typeof settings.logo.value === 'string'
+      ? settings.logo.value
+      : null
+
+  const logoUrl = logoValue
+    ? logoValue.startsWith('/media/')
+      ? `http://localhost:8000${logoValue}`
+      : logoValue
+    : null
+
+  const siteName = settings?.site_name?.value || 'Hardware Review'
+
   return (
     <footer className="border-t bg-background">
       <div className="container py-12">
@@ -33,21 +51,22 @@ function FooterContent() {
           {/* Brand */}
           <div className="space-y-4">
             <Link href="/" className="flex items-center space-x-2">
-              {settings?.logo?.value && typeof settings.logo.value === 'string' ? (
-                <Image 
-                  src={settings.logo.value.startsWith('/media/') ? `http://localhost:8000${settings.logo.value}` : settings.logo.value} 
-                  alt={settings.site_name?.value || 'Logo'} 
+              {logoUrl ? (
+                <Image
+                  src={logoUrl}
+                  alt={siteName}
+                  width={32}
+                  height={32}
                   className="h-8 w-8 rounded object-contain"
                 />
               ) : (
-                <div className="h-8 w-8 rounded bg-primary"></div>
+                <div className="h-8 w-8 rounded bg-primary" />
               )}
-              <span className="text-xl font-bold">
-                {settings?.site_name?.value || 'Hardware Review'}
-              </span>
+              <span className="text-xl font-bold">{siteName}</span>
             </Link>
             <p className="text-sm text-muted-foreground">
-              {settings?.site_description?.value || 'Donanım incelemeleri, karşılaştırmaları ve rehberleri ile en doğru seçimi yapın.'}
+              {settings?.site_description?.value ||
+                'Donanım incelemeleri, karşılaştırmaları ve rehberleri ile en doğru seçimi yapın.'}
             </p>
           </div>
 
@@ -89,7 +108,10 @@ function FooterContent() {
             <ul className="space-y-2 text-sm">
               {categories.map((category: unknown) => (
                 <li key={(category as { id: string }).id}>
-                  <Link href={`/category/${(category as { slug: string }).slug}`} className="text-muted-foreground hover:text-primary">
+                  <Link
+                    href={`/category/${(category as { slug: string }).slug}`}
+                    className="text-muted-foreground hover:text-primary"
+                  >
                     {(category as { name: string }).name}
                   </Link>
                 </li>
@@ -134,7 +156,10 @@ function FooterContent() {
               <Link href="/rss" className="text-sm text-muted-foreground hover:text-primary">
                 RSS
               </Link>
-              <Link href="/sitemap.xml" className="text-sm text-muted-foreground hover:text-primary">
+              <Link
+                href="/sitemap.xml"
+                className="text-sm text-muted-foreground hover:text-primary"
+              >
                 Sitemap
               </Link>
             </div>

@@ -457,38 +457,6 @@ export default function SignInPage() {
             </CardContent>
           </Card>
         )}
-
-        {/* Test Accounts */}
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle className="text-center text-lg">Test Hesapları</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {testAccounts.map((account, index) => (
-                <div key={index} className="border rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <Badge variant="outline">{account.role}</Badge>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        setEmail(account.email)
-                        setPassword(account.password)
-                      }}
-                    >
-                      Kullan
-                    </Button>
-                  </div>
-                  <div className="text-sm text-muted-foreground space-y-1">
-                    <div>Email: {account.email}</div>
-                    <div>Şifre: {account.password}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   )

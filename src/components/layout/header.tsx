@@ -1,10 +1,12 @@
 'use client'
 
+import type React from 'react'
 import Link from 'next/link'
 import { useSession, signOut } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import Image from 'next/image'
 import {
   Search,
   Menu,
@@ -41,7 +43,6 @@ interface Category {
 }
 
 /* ---------- Search result tipleri ---------- */
-
 
 interface ArticleSearchResult {
   kind: 'article'
@@ -120,17 +121,16 @@ export function Header() {
   const [searchResults, setSearchResults] = useState<SearchResultItem[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [showResults, setShowResults] = useState(false)
-  const [selectedIndex, setSelectedIndex] = useState(-1) // Spotlight-like selection
+  const [selectedIndex, setSelectedIndex] = useState(-1)
   const inputRef = useRef<HTMLInputElement>(null)
 
   /* ---------- Kategorileri çek ---------- */
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await fetch('/api/categories/public')
+        const response = await fetch('/api/categories')
         const result = await response.json()
         if (result.success && Array.isArray(result.data)) {
-          // parent olmayanları al
           const parentCategories: Category[] = result.data.filter(
             (category: Category & { parent?: unknown }) => !category.parent,
           )
@@ -234,7 +234,6 @@ export function Header() {
     if (item.kind === 'user') {
       return `/users/${item.id}`
     }
-    // product
     return `/products/by-slug/${item.slug}`
   }
 
@@ -299,6 +298,20 @@ export function Header() {
     await signOut({ callbackUrl: '/' })
   }
 
+  // Logo URL helper
+  const logoValue =
+    settings?.logo && typeof settings.logo.value === 'string'
+      ? settings.logo.value
+      : null
+
+  const logoUrl = logoValue
+    ? logoValue.startsWith('/media/')
+      ? `http://localhost:8000${logoValue}`
+      : logoValue
+    : null
+
+  const siteName = settings?.site_name?.value || 'Hardware Review'
+
   return (
     <>
       {/* Spotlight Search Overlay */}
@@ -352,7 +365,6 @@ export function Header() {
                   </Button>
                 </form>
 
-                {/* Spotlight-like Search Results */}
                 {showResults && searchResults.length > 0 && (
                   <div className="max-h-96 overflow-y-auto border-t">
                     <div className="space-y-1 p-2">
@@ -449,7 +461,6 @@ export function Header() {
                         )
                       })}
 
-                      {/* Footer with keyboard shortcuts */}
                       <div className="px-3 py-2 border-t bg-muted/30 text-xs text-muted-foreground">
                         <div className="flex items-center justify-between">
                           <span>↑↓ Navigate</span>
@@ -471,23 +482,20 @@ export function Header() {
         <div className="container flex h-16 items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2">
-            {settings?.logo?.value &&
-            typeof settings.logo.value === 'string' ? (
-              <img
-                src={
-                  settings.logo.value.startsWith('/media/')
-                    ? `http://localhost:8000${settings.logo.value}`
-                    : settings.logo.value
-                }
-                alt={settings.site_name?.value || 'Logo'}
-                className="h-8 w-8 rounded object-contain"
-              />
+            {logoUrl ? (
+              <div className="relative h-8 w-8 rounded overflow-hidden">
+                <Image
+                  src={logoUrl}
+                  alt={siteName}
+                  fill
+                  sizes="32px"
+                  className="object-contain"
+                />
+              </div>
             ) : (
               <div className="h-8 w-8 rounded bg-primary" />
             )}
-            <span className="text-xl font-bold">
-              {settings?.site_name?.value || 'Hardware Review'}
-            </span>
+            <span className="text-xl font-bold">{siteName}</span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -530,7 +538,6 @@ export function Header() {
                           )}
                         </Link>
 
-                        {/* Subcategories on hover */}
                         {category.children.length > 0 && (
                           <div className="absolute left-full top-0 ml-1 w-56 bg-background border rounded-md shadow-lg opacity-0 invisible group-hover/category:opacity-100 group-hover/category:visible transition-all duration-200 z-50">
                             <div className="py-2">
@@ -579,7 +586,6 @@ export function Header() {
 
           {/* Search and User Actions */}
           <div className="flex items-center space-x-4">
-            {/* Search Button */}
             <Button
               variant="ghost"
               size="icon"
@@ -603,7 +609,6 @@ export function Header() {
                   <Button variant="ghost" size="icon">
                     <User className="h-5 w-5" />
                   </Button>
-                  {/* User dropdown */}
                   <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                     <div className="py-1">
                       <div className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-600">
@@ -662,7 +667,6 @@ export function Header() {
               </div>
             )}
 
-            {/* Mobile Menu Button */}
             <Button
               variant="ghost"
               size="icon"
@@ -700,7 +704,6 @@ export function Header() {
                 Ürünler
               </Link>
 
-              {/* Mobile Categories */}
               <div className="border-t pt-4">
                 <div className="text-sm font-medium text-muted-foreground mb-2">
                   Kategoriler
@@ -738,7 +741,6 @@ export function Header() {
                 )}
               </div>
 
-              {/* Mobile Admin Link */}
               {session &&
                 (session.user.role === 'SUPER_ADMIN' ||
                   session.user.role === 'ADMIN') && (
