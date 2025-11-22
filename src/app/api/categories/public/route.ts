@@ -1,3 +1,5 @@
+// hardware/src/app/api/categories/public/route.ts
+
 import { NextRequest, NextResponse } from 'next/server'
 import { DJANGO_API_URL } from '@/lib/api'
 

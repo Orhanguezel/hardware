@@ -13,7 +13,7 @@ function FooterContent() {
     const fetchCategories = async () => {
       try {
         // 🔁 ESKİ: /api/categories/public  (artık yok)
-        const response = await fetch('/api/categories')
+        const response = await fetch('/api/categories/public')
         const result = await response.json()
 
         if (result.success && Array.isArray(result.data)) {
