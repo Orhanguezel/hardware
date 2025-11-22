@@ -1,3 +1,5 @@
+// hardware/src/app/api/products/route.ts
+
 import { NextRequest, NextResponse } from 'next/server'
 
 const DJANGO_API_URL = process.env.DJANGO_API_URL || 'http://localhost:8000/api'

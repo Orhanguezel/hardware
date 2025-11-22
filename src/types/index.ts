@@ -1,4 +1,3 @@
-import NextAuth from 'next-auth'
 
 declare module 'next-auth' {
   interface Session {
@@ -68,7 +67,7 @@ export interface Product {
   brand: string
   model: string
   slug: string
-  specs: Record<string, any>
+  specs: Record<string, unknown>
   release_year?: number
   cover_image?: string
   description?: string
@@ -83,7 +82,7 @@ export interface Article {
   title: string
   subtitle?: string
   excerpt?: string
-  content: Record<string, any>
+  content: Record<string, unknown>
   status: string
   author: User
   category?: Category
@@ -111,7 +110,7 @@ export interface Notification {
   id: number
   user: number
   type: string
-  payload: Record<string, any>
+  payload: Record<string, unknown>
   read_at?: string
   created_at: string
 }
@@ -145,7 +144,7 @@ export interface ReviewExtraData {
   scoreNumeric: number
   pros: string[]
   cons: string[]
-  technicalSpec?: Record<string, any>
+  technicalSpec?: Record<string, unknown>
 }
 
 export interface CompareRound {
@@ -165,7 +164,6 @@ export interface CompareExtraData {
 export interface ArticleWithRelations extends Article {
   author: User
   editor?: User | null
-  category?: Category | null
   articleTags: Array<{
     tag: Tag
   }>
@@ -192,7 +190,7 @@ export interface SearchFilters {
   sortBy?: 'score' | 'date' | 'popularity'
 }
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean
   data?: T
   error?: string

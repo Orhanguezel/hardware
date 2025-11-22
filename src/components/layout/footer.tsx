@@ -3,10 +3,11 @@
 import Link from 'next/link'
 import { useSettings } from '@/contexts/SettingsContext'
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 
 function FooterContent() {
   const { settings } = useSettings()
-  const [categories, setCategories] = useState<any[]>([])
+  const [categories, setCategories] = useState<unknown[]>([])
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -14,7 +15,7 @@ function FooterContent() {
         const response = await fetch('/api/categories/public')
         const result = await response.json()
         if (result.success) {
-          const parentCategories = result.data.filter((category: any) => !category.parent)
+          const parentCategories = result.data.filter((category: unknown) => !(category as { parent?: unknown }).parent)
           setCategories(parentCategories.slice(0, 4)) // Limit to 4 categories
         }
       } catch (error) {
@@ -33,7 +34,7 @@ function FooterContent() {
           <div className="space-y-4">
             <Link href="/" className="flex items-center space-x-2">
               {settings?.logo?.value && typeof settings.logo.value === 'string' ? (
-                <img 
+                <Image 
                   src={settings.logo.value.startsWith('/media/') ? `http://localhost:8000${settings.logo.value}` : settings.logo.value} 
                   alt={settings.site_name?.value || 'Logo'} 
                   className="h-8 w-8 rounded object-contain"
@@ -86,10 +87,10 @@ function FooterContent() {
           <div className="space-y-4">
             <h3 className="text-sm font-semibold">Kategoriler</h3>
             <ul className="space-y-2 text-sm">
-              {categories.map((category) => (
-                <li key={category.id}>
-                  <Link href={`/category/${category.slug}`} className="text-muted-foreground hover:text-primary">
-                    {category.name}
+              {categories.map((category: unknown) => (
+                <li key={(category as { id: string }).id}>
+                  <Link href={`/category/${(category as { slug: string }).slug}`} className="text-muted-foreground hover:text-primary">
+                    {(category as { name: string }).name}
                   </Link>
                 </li>
               ))}

@@ -11,8 +11,7 @@ import { TableCell } from '@tiptap/extension-table-cell'
 import { TableHeader } from '@tiptap/extension-table-header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
@@ -29,11 +28,8 @@ import {
   Link as LinkIcon,
   Table as TableIcon,
   Plus,
-  Minus,
   Check,
-  X,
   Upload,
-  Link2,
   Loader2
 } from 'lucide-react'
 
@@ -43,7 +39,7 @@ interface RichEditorProps {
   placeholder?: string
 }
 
-export default function RichEditor({ content = '', onChange, placeholder = 'İçeriğinizi yazın...' }: RichEditorProps) {
+export default function RichEditor({ content = '', onChange}: RichEditorProps) {
   const [showLinkDialog, setShowLinkDialog] = useState(false)
   const [linkUrl, setLinkUrl] = useState('')
   const [linkText, setLinkText] = useState('')
@@ -372,7 +368,7 @@ export default function RichEditor({ content = '', onChange, placeholder = 'İç
                         onChange={(e) => setImageAlt(e.target.value)}
                       />
                       <Button onClick={addImageFromUrl} className="w-full">
-                        URL'den Ekle
+                        Fotoğraf Ekle
                       </Button>
                     </div>
                   </div>

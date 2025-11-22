@@ -6,7 +6,7 @@ import { DJANGO_API_URL } from '@/lib/api'
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user?.id) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Token ${session.accessToken || ''}`,
+        'Authorization': `Token ${(session as any).accessToken}`
       },
     })
 

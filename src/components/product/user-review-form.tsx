@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, FormEvent } from 'react'
 import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -13,8 +13,46 @@ interface UserReviewFormProps {
   onReviewSubmitted?: () => void
 }
 
+/* ---------- Session tipleri (accessToken + role için genişletme) ---------- */
+interface SessionUser {
+  id?: string
+  role?: string
+}
+
+interface SessionWithToken {
+  user?: SessionUser
+  accessToken?: string
+}
+
+/* ---------- Mevcut review listesi için tipler ---------- */
+type ReviewStatus = 'APPROVED' | 'PENDING' | 'REJECTED' | string
+
+interface ExistingReviewSummary {
+  id: number
+  status: ReviewStatus
+}
+
+interface ReviewListResponse {
+  results?: ExistingReviewSummary[]
+}
+
+/* ---------- Tekil review detayı için tipler ---------- */
+interface ReviewDetail {
+  rating: number
+  title?: string | null
+  content: string
+  pros?: string[] | null
+  cons?: string[] | null
+}
+
+interface ReviewDetailResponse {
+  data: ReviewDetail
+}
+
 export function UserReviewForm({ productId, onReviewSubmitted }: UserReviewFormProps) {
-  const { data: session } = useSession()
+  const { data: rawSession } = useSession()
+  const session = rawSession as SessionWithToken | null
+
   const [rating, setRating] = useState(0)
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
@@ -22,45 +60,62 @@ export function UserReviewForm({ productId, onReviewSubmitted }: UserReviewFormP
   const [cons, setCons] = useState<string[]>([''])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [hasExistingReview, setHasExistingReview] = useState(false)
-  const [existingReviewStatus, setExistingReviewStatus] = useState<string | null>(null)
+  const [existingReviewStatus, setExistingReviewStatus] = useState<ReviewStatus | null>(null)
   const [existingReviewId, setExistingReviewId] = useState<number | null>(null)
 
-  // Check if user already has a review for this product
+  // Kullanıcının bu ürün için zaten yorumu var mı (her statüde)
   const checkExistingReview = async () => {
-    if (session?.user) {
+    if (session?.user?.id) {
       try {
-        // Get all reviews for this product by this user (all statuses)
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/reviews/?product=${parseInt(productId)}&user=${session.user.id}`, {
+        const productNumericId = Number.parseInt(productId, 10)
+        const accessToken = session.accessToken
+
+        const url = `${process.env.NEXT_PUBLIC_API_URL}/reviews/?product=${productNumericId}&user=${session.user.id}`
+
+        const response = await fetch(url, {
           headers: {
-            'Authorization': `Token ${(session as any).accessToken}`,
+            ...(accessToken ? { Authorization: `Token ${accessToken}` } : {}),
             'Content-Type': 'application/json',
           },
         })
+
         if (response.ok) {
-          const data = await response.json()
-          const reviews = data.results || []
-          
-          console.log('User reviews for product:', productId, 'User:', session.user.id, 'Reviews:', reviews)
-          
-          // Find APPROVED review first, then PENDING review, then most recent review
-          const approvedReview = reviews.find((review: any) => review.status === 'APPROVED')
-          const pendingReview = reviews.find((review: any) => review.status === 'PENDING')
-          const latestReview = reviews.length > 0 ? reviews[0] : null
-          
-          console.log('Found reviews - Approved:', approvedReview, 'Pending:', pendingReview, 'Latest:', latestReview)
-          
+          const data: ReviewListResponse = await response.json()
+          const reviews: ExistingReviewSummary[] = Array.isArray(data.results)
+            ? data.results
+            : []
+
+          console.log(
+            'User reviews for product:',
+            productId,
+            'User:',
+            session.user.id,
+            'Reviews:',
+            reviews,
+          )
+
+          const approvedReview = reviews.find((review) => review.status === 'APPROVED')
+          const pendingReview = reviews.find((review) => review.status === 'PENDING')
+          const latestReview = reviews.length > 0 ? reviews[0] : undefined
+
+          console.log(
+            'Found reviews - Approved:',
+            approvedReview,
+            'Pending:',
+            pendingReview,
+            'Latest:',
+            latestReview,
+          )
+
           if (approvedReview) {
-            // If there's an APPROVED review, show that
             setHasExistingReview(true)
             setExistingReviewStatus(approvedReview.status)
             setExistingReviewId(approvedReview.id)
           } else if (pendingReview) {
-            // If there's a PENDING review, show that
             setHasExistingReview(true)
             setExistingReviewStatus(pendingReview.status)
             setExistingReviewId(pendingReview.id)
           } else if (latestReview) {
-            // If no APPROVED or PENDING review, show the most recent one
             setHasExistingReview(true)
             setExistingReviewStatus(latestReview.status)
             setExistingReviewId(latestReview.id)
@@ -78,20 +133,22 @@ export function UserReviewForm({ productId, onReviewSubmitted }: UserReviewFormP
 
   useEffect(() => {
     checkExistingReview()
-  }, [session?.user, productId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user?.id, productId])
 
   const loadExistingReviewData = async () => {
     if (existingReviewId) {
       try {
         const response = await fetch(`/api/reviews/${existingReviewId}`)
         if (response.ok) {
-          const data = await response.json()
+          const data: ReviewDetailResponse = await response.json()
           const review = data.data
+
           setRating(review.rating)
-          setTitle(review.title || '')
+          setTitle(review.title ?? '')
           setContent(review.content)
-          setPros(review.pros || [''])
-          setCons(review.cons || [''])
+          setPros(review.pros && review.pros.length > 0 ? review.pros : [''])
+          setCons(review.cons && review.cons.length > 0 ? review.cons : [''])
         }
       } catch (error) {
         console.error('Error loading existing review:', error)
@@ -104,37 +161,41 @@ export function UserReviewForm({ productId, onReviewSubmitted }: UserReviewFormP
   }
 
   const addPro = () => {
-    setPros([...pros, ''])
+    setPros((prev) => [...prev, ''])
   }
 
   const removePro = (index: number) => {
-    setPros(pros.filter((_, i) => i !== index))
+    setPros((prev) => prev.filter((_, i) => i !== index))
   }
 
   const updatePro = (index: number, value: string) => {
-    const newPros = [...pros]
-    newPros[index] = value
-    setPros(newPros)
+    setPros((prev) => {
+      const next = [...prev]
+      next[index] = value
+      return next
+    })
   }
 
   const addCon = () => {
-    setCons([...cons, ''])
+    setCons((prev) => [...prev, ''])
   }
 
   const removeCon = (index: number) => {
-    setCons(cons.filter((_, i) => i !== index))
+    setCons((prev) => prev.filter((_, i) => i !== index))
   }
 
   const updateCon = (index: number, value: string) => {
-    const newCons = [...cons]
-    newCons[index] = value
-    setCons(newCons)
+    setCons((prev) => {
+      const next = [...prev]
+      next[index] = value
+      return next
+    })
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    
-    if (!session?.user) {
+
+    if (!session?.user?.id) {
       alert('Yorum yapmak için giriş yapmalısınız')
       return
     }
@@ -152,7 +213,6 @@ export function UserReviewForm({ productId, onReviewSubmitted }: UserReviewFormP
     setIsSubmitting(true)
 
     try {
-      // Always create a new review, even for REJECTED ones
       const response = await fetch(`/api/products/${productId}/reviews`, {
         method: 'POST',
         headers: {
@@ -162,12 +222,12 @@ export function UserReviewForm({ productId, onReviewSubmitted }: UserReviewFormP
           rating,
           title: title.trim() || null,
           content: content.trim(),
-          pros: pros.filter(p => p.trim()),
-          cons: cons.filter(c => c.trim())
+          pros: pros.map((p) => p.trim()).filter(Boolean),
+          cons: cons.map((c) => c.trim()).filter(Boolean),
         }),
       })
 
-      const result = await response.json()
+      const result: { success: boolean; error?: string } = await response.json()
 
       if (result.success) {
         setRating(0)
@@ -175,10 +235,9 @@ export function UserReviewForm({ productId, onReviewSubmitted }: UserReviewFormP
         setContent('')
         setPros([''])
         setCons([''])
-        
-        // Refresh review status after submission
+
         await checkExistingReview()
-        
+
         alert('Yorumunuz başarıyla gönderildi. Onay bekliyor.')
         onReviewSubmitted?.()
       } else {
@@ -192,7 +251,7 @@ export function UserReviewForm({ productId, onReviewSubmitted }: UserReviewFormP
     }
   }
 
-  if (!session?.user) {
+  if (!session?.user?.id) {
     return (
       <Card>
         <CardContent className="py-8">
@@ -217,7 +276,8 @@ export function UserReviewForm({ productId, onReviewSubmitted }: UserReviewFormP
           <div className="text-center">
             <h3 className="text-lg font-semibold mb-2">Zaten Değerlendirme Yaptınız</h3>
             <p className="text-muted-foreground mb-4">
-              Bu ürün için onaylanmış bir değerlendirmeniz var. Her ürün için sadece bir kez değerlendirme yapabilirsiniz.
+              Bu ürün için onaylanmış bir değerlendirmeniz var. Her ürün için sadece bir kez
+              değerlendirme yapabilirsiniz.
             </p>
           </div>
         </CardContent>
@@ -247,15 +307,17 @@ export function UserReviewForm({ productId, onReviewSubmitted }: UserReviewFormP
           <div className="text-center">
             <h3 className="text-lg font-semibold mb-2">Değerlendirmeniz Reddedildi</h3>
             <p className="text-muted-foreground mb-4">
-              Bu ürün için gönderdiğiniz değerlendirme reddedildi. Yeni bir değerlendirme gönderebilirsiniz.
+              Bu ürün için gönderdiğiniz değerlendirme reddedildi. Yeni bir değerlendirme
+              gönderebilirsiniz.
             </p>
-            <Button onClick={() => {
-              setHasExistingReview(false)
-              // Load existing review data
-              if (existingReviewId) {
-                loadExistingReviewData()
-              }
-            }}>
+            <Button
+              onClick={() => {
+                setHasExistingReview(false)
+                if (existingReviewId) {
+                  void loadExistingReviewData()
+                }
+              }}
+            >
               Değerlendirmeyi Düzenle
             </Button>
           </div>
@@ -268,16 +330,16 @@ export function UserReviewForm({ productId, onReviewSubmitted }: UserReviewFormP
     <Card>
       <CardHeader>
         <CardTitle>
-          {existingReviewId && existingReviewStatus === 'REJECTED' ? 'Yeni Değerlendirme Gönder' : 'Ürün Değerlendirmesi'}
+          {existingReviewId && existingReviewStatus === 'REJECTED'
+            ? 'Yeni Değerlendirme Gönder'
+            : 'Ürün Değerlendirmesi'}
         </CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Puanlama */}
           <div>
-            <label className="block text-sm font-medium mb-2">
-              Genel Puanınız *
-            </label>
+            <label className="block text-sm font-medium mb-2">Genel Puanınız *</label>
             <div className="flex items-center gap-1">
               {[1, 2, 3, 4, 5].map((star) => (
                 <button
@@ -303,9 +365,7 @@ export function UserReviewForm({ productId, onReviewSubmitted }: UserReviewFormP
 
           {/* Başlık */}
           <div>
-            <label className="block text-sm font-medium mb-2">
-              Başlık (Opsiyonel)
-            </label>
+            <label className="block text-sm font-medium mb-2">Başlık (Opsiyonel)</label>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -316,9 +376,7 @@ export function UserReviewForm({ productId, onReviewSubmitted }: UserReviewFormP
 
           {/* Yorum */}
           <div>
-            <label className="block text-sm font-medium mb-2">
-              Yorumunuz *
-            </label>
+            <label className="block text-sm font-medium mb-2">Yorumunuz *</label>
             <Textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
@@ -335,9 +393,7 @@ export function UserReviewForm({ productId, onReviewSubmitted }: UserReviewFormP
           {/* Artıları - Sadece admin için */}
           {session?.user?.role === 'ADMIN' && (
             <div>
-              <label className="block text-sm font-medium mb-2">
-                Artıları
-              </label>
+              <label className="block text-sm font-medium mb-2">Artıları</label>
               <div className="space-y-2">
                 {pros.map((pro, index) => (
                   <div key={index} className="flex gap-2">
@@ -377,9 +433,7 @@ export function UserReviewForm({ productId, onReviewSubmitted }: UserReviewFormP
           {/* Eksileri - Sadece admin için */}
           {session?.user?.role === 'ADMIN' && (
             <div>
-              <label className="block text-sm font-medium mb-2">
-                Eksileri
-              </label>
+              <label className="block text-sm font-medium mb-2">Eksileri</label>
               <div className="space-y-2">
                 {cons.map((con, index) => (
                   <div key={index} className="flex gap-2">
@@ -422,10 +476,11 @@ export function UserReviewForm({ productId, onReviewSubmitted }: UserReviewFormP
             disabled={isSubmitting || rating === 0 || !content.trim()}
             className="w-full"
           >
-            {isSubmitting 
-              ? 'Gönderiliyor...' 
-              : (existingReviewId && existingReviewStatus === 'REJECTED' ? 'Yeni Değerlendirme Gönder' : 'Değerlendirmeyi Gönder')
-            }
+            {isSubmitting
+              ? 'Gönderiliyor...'
+              : existingReviewId && existingReviewStatus === 'REJECTED'
+                ? 'Yeni Değerlendirme Gönder'
+                : 'Değerlendirmeyi Gönder'}
           </Button>
         </form>
       </CardContent>

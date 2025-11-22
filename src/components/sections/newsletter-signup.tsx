@@ -47,7 +47,7 @@ export function NewsletterSignup() {
       }
     } catch (error) {
       setIsSuccess(false)
-      setMessage('Bağlantı hatası. Lütfen tekrar deneyin.')
+      setMessage(error instanceof Error ? error.message : 'Bağlantı hatası. Lütfen tekrar deneyin.')
     } finally {
       setIsLoading(false)
     }

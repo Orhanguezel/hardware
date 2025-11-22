@@ -1,13 +1,14 @@
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
-import { Calendar, Clock, ArrowRight,User } from 'lucide-react'
+import { Calendar, ArrowRight,User } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 
 interface Article {
   id: number
   title: string
+  slug: string
   subtitle?: string
   type: string
   status: string

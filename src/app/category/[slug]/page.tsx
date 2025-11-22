@@ -237,11 +237,11 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   // Get all tags and article types for filtering
   const allTags = Array.from(
     new Set(
-      articles.flatMap(article => 
+      articles.flatMap((article: any) => 
         article.tags || []
       )
     )
-  ).sort((a, b) => a.name.localeCompare(b.name))
+  ).sort((a: any, b: any) => a.name.localeCompare(b.name))
 
   // Filter article types based on view
   const availableTypes = view === 'products' 
@@ -249,8 +249,8 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
     : ['REVIEW', 'NEWS', 'GUIDE', 'BEST_LIST', 'COMPARE']
   
   const articleTypes = Array.from(
-    new Set(articles.map(article => article.type))
-  ).filter(type => availableTypes.includes(type)).sort()
+    new Set(articles.map((article: any) => article.type))
+  ).filter((type: any) => availableTypes.includes(type)).sort()
 
   const totalPages = Math.ceil(totalArticles / 12)
 
@@ -319,7 +319,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
                     >
                       <span className="text-sm">Tümü</span>
                     </Link>
-                    {articleTypes.map((type) => {
+                    {articleTypes.map((type: any) => {
                       const typeLabels = {
                         'REVIEW': 'İnceleme',
                         'NEWS': 'Haber',
@@ -346,7 +346,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
                 <div>
                   <h3 className="font-semibold mb-3">Etiketler</h3>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {allTags.map((tag) => (
+                    {allTags.map((tag: any) => (
                       <Link
                         key={tag.id}
                         href={`/category/${slug}?view=${view}&tag=${tag.slug}`}

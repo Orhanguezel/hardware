@@ -3,13 +3,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Slider } from '@/components/ui/slider'
 import { Progress } from '@/components/ui/progress'
 import { 
-  Star, 
-  TrendingUp, 
   Zap, 
   Shield, 
   Wifi, 
@@ -24,7 +21,7 @@ interface Criteria {
   id: string
   name: string
   weight: number
-  icon: React.ComponentType<any>
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>
   description: string
 }
 
@@ -133,7 +130,7 @@ export default function RatingEngine({ onScoreChange, initialScores, profile = '
     let totalWeight = 0
     
     criteria.forEach(criterion => {
-      const weight = (profileWeights as any)[criterion.id] || criterion.weight
+      const weight = (profileWeights as Record<string, number>)[criterion.id] || criterion.weight
       weightedSum += scores[criterion.id] * weight
       totalWeight += weight
     })
@@ -202,7 +199,7 @@ export default function RatingEngine({ onScoreChange, initialScores, profile = '
                   key={key}
                   variant={currentProfile === key ? 'default' : 'outline'}
                   size="sm"
-                  onClick={() => setCurrentProfile(key as any)}
+                  onClick={() => setCurrentProfile(key as keyof typeof profiles)}
                   className="flex items-center gap-2"
                 >
                   <Icon className="w-4 h-4" />
@@ -238,7 +235,7 @@ export default function RatingEngine({ onScoreChange, initialScores, profile = '
       <div className="space-y-4">
         {criteria.map((criterion) => {
           const Icon = criterion.icon
-          const profileWeight = (profiles[currentProfile as keyof typeof profiles].adjustments as any)[criterion.id] || criterion.weight
+          const profileWeight = (profiles[currentProfile as keyof typeof profiles].adjustments as Record<string, number>)[criterion.id] || criterion.weight
           
           return (
             <Card key={criterion.id}>

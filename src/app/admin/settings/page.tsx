@@ -1,3 +1,5 @@
+// src/app/admin/settings/page.tsx
+
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -189,31 +191,32 @@ export default function SettingsPage() {
           site_name: settings.siteName,
           site_description: settings.siteDescription,
           user_registration: settings.userRegistration.toString(),
-          affiliate_tracking: settings.affiliateTracking.toString()
+          affiliate_tracking: settings.affiliateTracking.toString(),
+          logo: settings.logoFile ? '' : settings.logo,
+          favicon: settings.faviconFile ? '' : settings.favicon,
         },
         appearance: {
           primary_color: settings.primaryColor,
           secondary_color: settings.secondaryColor,
-          custom_css: settings.customCss
+          custom_css: settings.customCss,
         },
         seo: {
           seo_title: settings.seoTitle,
           seo_description: settings.seoDescription,
-          seo_keywords: settings.seoKeywords
+          seo_keywords: settings.seoKeywords,
         },
         notifications: {
           email_notifications: settings.emailNotifications.toString(),
-          comment_moderation: settings.commentModeration.toString()
+          comment_moderation: settings.commentModeration.toString(),
         },
         integrations: {
           google_analytics: settings.googleAnalytics,
-          facebook_pixel: settings.facebookPixel
+          facebook_pixel: settings.facebookPixel,
         },
         advanced: {
-          custom_js: settings.customJs
-        }
+          custom_js: settings.customJs,
+        },
       }
-
       // Add logo and favicon to general settings if no file is being uploaded
       if (!settings.logoFile) {
         settingsData.general.logo = settings.logo

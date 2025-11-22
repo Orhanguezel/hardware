@@ -10,18 +10,9 @@ import {
   Monitor, 
   Router, 
   HardDrive, 
-  Headphones, 
-  Smartphone,
-  Laptop,
   Gamepad2,
-  Zap,
-  Wifi,
   MemoryStick,
-  Thermometer,
-  Power,
-  Package,
   Printer,
-  Scan
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -478,7 +469,7 @@ const getCategoryFilters = (categorySlug: string) => {
   }
 }
 
-export function CategoryFilters({ categorySlug, categoryName, searchParams }: CategoryFiltersProps) {
+export function CategoryFilters({ categorySlug, searchParams }: CategoryFiltersProps) {
   const [filters, setFilters] = useState(searchParams)
   const categoryFilterConfig = getCategoryFilters(categorySlug)
 

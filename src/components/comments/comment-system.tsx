@@ -1,6 +1,9 @@
+//  hardware/src/components/comments/comment-system.tsx
+
 'use client'
 
 import { useState, useEffect } from 'react'
+import type { MouseEvent } from 'react'
 import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -12,7 +15,6 @@ import {
   Reply, 
   User,
   Calendar,
-  Star,
   Send
 } from 'lucide-react'
 
@@ -29,7 +31,8 @@ interface Comment {
 }
 
 interface CommentSystemProps {
-  articleId: number
+  articleId: number | string
+  articleTitle?: string
   comments?: Comment[]
   onCommentSubmit?: (content: string, parentId?: string) => void
   onHelpfulVote?: (commentId: number) => void
@@ -37,8 +40,9 @@ interface CommentSystemProps {
 
 export default function CommentSystem({ 
   articleId, 
+  articleTitle,
   comments: initialComments = [], 
-  onCommentSubmit, 
+  // onCommentSubmit, // şu an kullanılmıyor, lint hatasını önlemek için destructure’dan çıkarıldı
   onHelpfulVote
 }: CommentSystemProps) {
   const { data: session } = useSession()
@@ -76,7 +80,7 @@ export default function CommentSystem({
 
   // Handle helpful vote
   const handleHelpfulVote = async (commentId: number) => {
-    if (!session?.accessToken) {
+    if (!(session as any)?.accessToken) {
       alert('Yorum oylamak için giriş yapmalısınız')
       return
     }
@@ -85,7 +89,7 @@ export default function CommentSystem({
       const response = await fetch(`/api/comments/${commentId}/helpful`, {
         method: 'POST',
         headers: {
-          'Authorization': `Token ${session.accessToken}`,
+          'Authorization': `Token ${(session as any).accessToken}`,
           'Content-Type': 'application/json',
         },
       })
@@ -138,7 +142,7 @@ export default function CommentSystem({
         body: JSON.stringify({
           content: newComment.trim(),
           articleId,
-          authorId: session.user?.id,
+          authorId: (session.user as any)?.id,
           authorName: session.user?.name,
           authorEmail: session.user?.email,
           ipAddress: '127.0.0.1' // In production, get real IP
@@ -216,7 +220,7 @@ export default function CommentSystem({
             content: replyContent.trim(),
             articleId,
             parent: replyingTo,
-            authorId: session.user?.id,
+            authorId: (session.user as any)?.id,
             authorName: session.user?.name,
             authorEmail: session.user?.email,
             ipAddress: '127.0.0.1'
@@ -240,14 +244,20 @@ export default function CommentSystem({
     }
   }
 
-
-  const CommentItem = ({ comment, isReply = false, onHelpfulVote }: { comment: Comment, isReply?: boolean, onHelpfulVote?: (commentId: number) => void }) => {
+  const CommentItem = ({
+    comment,
+    isReply = false,
+    onHelpfulVote,
+  }: {
+    comment: Comment
+    isReply?: boolean
+    onHelpfulVote?: (commentId: number) => void
+  }) => {
     const [showReplies, setShowReplies] = useState(false)
     
     // Handle replies toggle with proper event handling
-    const handleToggleReplies = (e: React.MouseEvent) => {
+    const handleToggleReplies = (e: MouseEvent) => {
       e.stopPropagation()
-      console.log('Toggling replies for comment:', comment.id, 'Current state:', showReplies)
       setShowReplies(!showReplies)
     }
     
@@ -371,7 +381,12 @@ export default function CommentSystem({
                   {showReplies && (
                     <div className="mt-4 space-y-4">
                       {comment.replies.map((reply) => (
-                        <CommentItem key={reply.id} comment={reply} isReply onHelpfulVote={onHelpfulVote} />
+                        <CommentItem
+                          key={reply.id}
+                          comment={reply}
+                          isReply
+                          onHelpfulVote={onHelpfulVote}
+                        />
                       ))}
                     </div>
                   )}
@@ -383,6 +398,10 @@ export default function CommentSystem({
       </div>
     )
   }
+
+  const approvedTopLevelCount = comments.filter(
+    (c) => c.status === 'APPROVED' && !c.parent
+  ).length
 
   return (
     <div className="space-y-6">
@@ -436,7 +455,7 @@ export default function CommentSystem({
       <div>
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-semibold">
-            Yorumlar ({comments.filter(c => c.status === 'APPROVED' && !c.parent).length})
+            {articleTitle ? `${articleTitle} için Yorumlar` : 'Yorumlar'} ({approvedTopLevelCount})
           </h3>
           <div className="flex gap-2">
             <select 
@@ -453,7 +472,11 @@ export default function CommentSystem({
 
         <div className="space-y-4">
           {getSortedComments(comments).map((comment) => (
-            <CommentItem key={comment.id} comment={comment} onHelpfulVote={handleHelpfulVote} />
+            <CommentItem
+              key={comment.id}
+              comment={comment}
+              onHelpfulVote={handleHelpfulVote}
+            />
           ))}
         </div>
 
@@ -471,7 +494,6 @@ export default function CommentSystem({
           </Card>
         )}
       </div>
-
     </div>
   )
 }

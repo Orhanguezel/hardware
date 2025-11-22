@@ -78,7 +78,7 @@ export function PopularFeatures({ features, selectedFeature }: PopularFeaturesPr
 
         {filteredFeatures.length === 0 && searchTerm && (
           <div className="text-sm text-muted-foreground p-2 text-center">
-            "{searchTerm}" için özellik bulunamadı
+            Aradığınız özellik bulunamadı.
           </div>
         )}
       </div>

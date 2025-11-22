@@ -70,9 +70,12 @@ export default function ComparePage() {
   const [showDifferences, setShowDifferences] = useState(false)
   const [loading, setLoading] = useState(true)
   const [categories, setCategories] = useState<Category[]>([])
-  const [selectedMainCategory, setSelectedMainCategory] = useState<number | string>('')
-  const [selectedSubCategory, setSelectedSubCategory] = useState<number | string>('')
-  const [selectedCategory, setSelectedCategory] = useState<number | string>('')
+
+  // Seçimler string olacak; "all" ya da kategori id'si (string)
+  const [selectedMainCategory, setSelectedMainCategory] = useState<string>('all')
+  const [selectedSubCategory, setSelectedSubCategory] = useState<string>('all')
+  // Eğer ileride kullanacaksan diye string bıraktım
+  const [selectedCategory, setSelectedCategory] = useState<string>('')
 
   useEffect(() => {
     fetchProducts()
@@ -87,7 +90,7 @@ export default function ComparePage() {
       window.history.replaceState({}, '', newUrl)
       
       // Ürünü otomatik olarak ekle
-      addProductToComparison(parseInt(addProductId))
+      addProductToComparison(parseInt(addProductId, 10))
     }
   }, [])
 
@@ -123,9 +126,14 @@ export default function ComparePage() {
     }
   }
 
-  const fetchProductsByMainCategory = async (mainCategoryId: number) => {
+  const fetchProductsByMainCategory = async (mainCategoryId: string) => {
     try {
-      console.log('Main category ID:', mainCategoryId)
+      console.log('Main category ID (string):', mainCategoryId)
+      const mainIdNum = parseInt(mainCategoryId, 10)
+      if (Number.isNaN(mainIdNum)) {
+        await fetchProducts()
+        return
+      }
       
       // Tüm ürünleri çek ve client-side'da filtrele
       const response = await fetch('/api/products?limit=1000')
@@ -137,7 +145,7 @@ export default function ComparePage() {
         // Ana kategori ve alt kategorilerindeki ürünleri filtrele
         const subCategories = getSubCategories(mainCategoryId)
         const subCategoryIds = subCategories.map(cat => cat.id)
-        const allCategoryIds = [mainCategoryId, ...subCategoryIds]
+        const allCategoryIds = [mainIdNum, ...subCategoryIds]
         
         console.log('Filtering by category IDs:', allCategoryIds)
         
@@ -185,7 +193,7 @@ export default function ComparePage() {
 
     // İlk ürün seçiliyorsa, kategoriyi belirle
     if (selectedProducts.length === 0) {
-      setSelectedCategory(product.category?.id || '')
+      setSelectedCategory(product.category?.id?.toString() || '')
       setSelectedProducts([...selectedProducts, product])
       toast.success(`${product.brand} ${product.model} karşılaştırmaya eklendi`)
       return
@@ -234,7 +242,7 @@ export default function ComparePage() {
     }
   }
 
-  const removeFromComparison = (productId: string) => {
+  const removeFromComparison = (productId: number) => {
     setSelectedProducts(selectedProducts.filter(p => p.id !== productId))
   }
 
@@ -247,41 +255,43 @@ export default function ComparePage() {
     return categories.filter(cat => !cat.parent)
   }
 
-  const getSubCategories = (mainCategoryId: number) => {
-    return categories.filter(cat => cat.parent === mainCategoryId)
+  const getSubCategories = (mainCategoryId: string) => {
+    const idNum = parseInt(mainCategoryId, 10)
+    if (Number.isNaN(idNum)) return []
+    return categories.filter(cat => cat.parent === idNum)
   }
 
   const handleMainCategoryChange = (categoryId: string) => {
-    const newMainCategory = categoryId === 'all' ? '' : parseInt(categoryId)
+    // "all" veya kategori id'si string olarak gelir
+    const newMainCategory = categoryId
     setSelectedMainCategory(newMainCategory)
-    setSelectedSubCategory('') // Alt kategori seçimini sıfırla
+    setSelectedSubCategory('all') // Alt kategori seçimini sıfırla
     
     console.log('Main category changed to:', newMainCategory)
     
-    // Ana kategori değiştiğinde ürünleri yeniden çek
-    if (newMainCategory) {
-      setLoading(true)
+    setLoading(true)
+    if (newMainCategory !== 'all') {
       // Ana kategori için özel bir API çağrısı yapalım
       fetchProductsByMainCategory(newMainCategory)
     } else {
-      setLoading(true)
       fetchProducts()
     }
   }
 
   const handleSubCategoryChange = (categoryId: string) => {
-    const newSubCategory = categoryId === 'all' ? '' : parseInt(categoryId)
+    const newSubCategory = categoryId
     setSelectedSubCategory(newSubCategory)
     
+    setLoading(true)
     // Alt kategori değiştiğinde ürünleri yeniden çek
-    if (newSubCategory) {
-      setLoading(true)
-      fetchProducts(newSubCategory)
-    } else if (selectedMainCategory) {
-      setLoading(true)
-      fetchProducts(selectedMainCategory)
+    if (newSubCategory !== 'all') {
+      const subIdNum = parseInt(newSubCategory, 10)
+      fetchProducts(subIdNum)
+    } else if (selectedMainCategory !== 'all') {
+      // Alt kategori "all" ama ana kategori seçiliyse
+      const mainIdNum = parseInt(selectedMainCategory, 10)
+      fetchProducts(mainIdNum)
     } else {
-      setLoading(true)
       fetchProducts()
     }
   }
@@ -385,14 +395,14 @@ export default function ComparePage() {
               
               <div className="flex flex-col sm:flex-row gap-2">
                 {/* Ana Kategori Seçimi */}
-                <Select value={selectedMainCategory || 'all'} onValueChange={handleMainCategoryChange}>
+                <Select value={selectedMainCategory} onValueChange={handleMainCategoryChange}>
                   <SelectTrigger className="w-full sm:w-48">
                     <SelectValue placeholder="Ana Kategori Seç" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Tüm Ana Kategoriler</SelectItem>
                     {getMainCategories().map((category) => (
-                      <SelectItem key={category.id} value={category.id}>
+                      <SelectItem key={category.id} value={category.id.toString()}>
                         {category.name}
                       </SelectItem>
                     ))}
@@ -400,15 +410,15 @@ export default function ComparePage() {
                 </Select>
 
                 {/* Alt Kategori Seçimi */}
-                {selectedMainCategory && (
-                  <Select value={selectedSubCategory || 'all'} onValueChange={handleSubCategoryChange}>
+                {selectedMainCategory !== 'all' && (
+                  <Select value={selectedSubCategory} onValueChange={handleSubCategoryChange}>
                     <SelectTrigger className="w-full sm:w-48">
                       <SelectValue placeholder="Alt Kategori Seç" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Tüm Alt Kategoriler</SelectItem>
                       {getSubCategories(selectedMainCategory).map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
+                        <SelectItem key={category.id} value={category.id.toString()}>
                           {category.name}
                         </SelectItem>
                       ))}
@@ -419,14 +429,14 @@ export default function ComparePage() {
             </div>
 
             {/* Filtre Temizleme */}
-            {(selectedMainCategory || selectedSubCategory) && (
-              <div className="flex gap-2">
+            {(selectedMainCategory !== 'all' || selectedSubCategory !== 'all') && (
+              <div className="flex gap-2 items-center flex-wrap">
                 <Button 
                   variant="outline" 
                   size="sm"
                   onClick={() => {
-                    setSelectedMainCategory('')
-                    setSelectedSubCategory('')
+                    setSelectedMainCategory('all')
+                    setSelectedSubCategory('all')
                     setLoading(true)
                     fetchProducts()
                   }}
@@ -435,8 +445,16 @@ export default function ComparePage() {
                   Filtreleri Temizle
                 </Button>
                 <Badge variant="secondary" className="px-3 py-1">
-                  {selectedMainCategory && getMainCategories().find(c => c.id === selectedMainCategory)?.name}
-                  {selectedSubCategory && ` > ${getSubCategories(selectedMainCategory).find(c => c.id === selectedSubCategory)?.name}`}
+                  {selectedMainCategory !== 'all' && (() => {
+                    const idNum = parseInt(selectedMainCategory, 10)
+                    const main = getMainCategories().find(c => c.id === idNum)
+                    return main?.name || ''
+                  })()}
+                  {selectedSubCategory !== 'all' && (() => {
+                    const subIdNum = parseInt(selectedSubCategory, 10)
+                    const sub = getSubCategories(selectedMainCategory).find(c => c.id === subIdNum)
+                    return sub ? ` > ${sub.name}` : ''
+                  })()}
                 </Badge>
               </div>
             )}
@@ -501,7 +519,7 @@ export default function ComparePage() {
                   <Checkbox 
                     id="show-differences" 
                     checked={showDifferences}
-                    onCheckedChange={(checked) => setShowDifferences(checked as boolean)}
+                    onCheckedChange={(checked) => setShowDifferences(!!checked)}
                   />
                   <Label htmlFor="show-differences">Sadece farkları göster</Label>
                 </div>
