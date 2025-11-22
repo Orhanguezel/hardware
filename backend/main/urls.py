@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 from . import views
 from . import newsletter_views
 from . import password_reset_views
+from . import email_test_views 
 
 # Create router for ViewSets (if needed in future)
 router = DefaultRouter()
@@ -109,6 +110,10 @@ urlpatterns = [
     path('auth/request-password-reset/', password_reset_views.request_password_reset_view, name='request-password-reset'),
     path('auth/verify-reset-code/', password_reset_views.verify_reset_code_view, name='verify-reset-code'),
     path('auth/reset-password/', password_reset_views.reset_password_view, name='reset-password'),
+
+    # Test email
+    path('email/test/', email_test_views.test_email_view, name='email-test'),
+
     
     # Include router URLs
     path('', include(router.urls)),

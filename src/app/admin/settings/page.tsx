@@ -5,24 +5,25 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
-import { 
-  Save, 
-  Settings, 
-  Globe, 
-  Mail, 
+import {
+  Save,
+  Settings,
+  Mail,
   Shield,
   Palette,
   Database,
   Bell,
   Search,
   Link as LinkIcon,
-  Trash2
+  Trash2,
 } from 'lucide-react'
+
+/* ---------- Types ---------- */
 
 interface SiteSettings {
   siteName: string
@@ -30,8 +31,8 @@ interface SiteSettings {
   siteUrl: string
   logo: string
   favicon: string
-  logoFile?: File
-  faviconFile?: File
+  logoFile?: File | null
+  faviconFile?: File | null
   primaryColor: string
   secondaryColor: string
   emailNotifications: boolean
@@ -45,53 +46,114 @@ interface SiteSettings {
   facebookPixel: string
   customCss: string
   customJs: string
+
+  // ✉️ Mail ayarları
+  emailHost: string
+  emailPort: string
+  emailUseTls: boolean
+  emailUseSsl: boolean
+  emailUser: string
+  emailPassword: string
+  defaultFromEmail: string
 }
+
+// Tab id tipi
+type TabId =
+  | 'general'
+  | 'appearance'
+  | 'seo'
+  | 'notifications'
+  | 'email'
+  | 'integrations'
+  | 'advanced'
+
+interface Tab {
+  id: TabId
+  label: string
+  icon: typeof Settings
+}
+
+// Backend’ten dönebilecek settings grup tipi
+interface SettingsGroup {
+  [key: string]:
+    | string
+    | number
+    | boolean
+    | null
+    | undefined
+    | { value?: string | number | boolean | null }
+}
+
+interface DjangoSettingsResponse {
+  general?: SettingsGroup
+  appearance?: SettingsGroup
+  seo?: SettingsGroup
+  notifications?: SettingsGroup
+  integrations?: SettingsGroup
+  advanced?: SettingsGroup
+  email?: SettingsGroup
+}
+
+interface SettingsApiResponse {
+  success: boolean
+  data?: DjangoSettingsResponse
+  error?: string
+}
+
+interface TestEmailApiResponse {
+  success?: boolean
+  error?: string
+  detail?: string
+  message?: string
+  data?: unknown
+}
+
+// Session.user için minimal tip (any yerine)
+interface SessionUser {
+  id?: string
+  role?: string
+  email?: string | null
+  name?: string | null
+  [key: string]: unknown
+}
+
+/* ---------- Helpers ---------- */
+
+// Django media base URL (dev/prod için env'den de gelebilir)
+const MEDIA_BASE_URL =
+  process.env.NEXT_PUBLIC_DJANGO_MEDIA_URL ?? 'http://localhost:8000'
+
+const resolveMediaUrl = (path?: string) => {
+  if (!path || typeof path !== 'string') return ''
+  return path.startsWith('/media/') ? `${MEDIA_BASE_URL}${path}` : path
+}
+
+/**
+ * Backend’ten gelen settings object’inde
+ * hem `{ key: "val" }` hem `{ key: { value: "val" } }` formatlarını normalize eder
+ */
+const getVal = (
+  group: SettingsGroup | undefined,
+  key: string,
+  fallback: string
+): string => {
+  if (!group) return fallback
+  const raw = group[key]
+  if (raw === null || raw === undefined) return fallback
+
+  if (typeof raw === 'object' && 'value' in raw) {
+    const v = (raw as { value?: unknown }).value
+    return v !== null && v !== undefined ? String(v) : fallback
+  }
+
+  return String(raw)
+}
+
+/* ---------- Component ---------- */
 
 export default function SettingsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
-
-  // Check if user is SUPER_ADMIN
-  useEffect(() => {
-    if (status === 'loading') return
-
-    if (!session) {
-      router.push('/auth/signin')
-      return
-    }
-
-    const userRole = (session.user as any)?.role
-    if (userRole !== 'SUPER_ADMIN') {
-      router.push('/admin')
-      return
-    }
-  }, [session, status, router])
-
-  // Show loading while checking authentication
-  if (status === 'loading') {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p>Yetki kontrolü yapılıyor...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // Redirect if not SUPER_ADMIN
-  if (!session || (session.user as any)?.role !== 'SUPER_ADMIN') {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">Erişim Reddedildi</h1>
-          <p className="text-muted-foreground mb-4">
-            Bu sayfaya erişim yetkiniz bulunmuyor. Sadece Süper Admin erişebilir.
-          </p>
-        </div>
-      </div>
-    )
-  }
 
   const [settings, setSettings] = useState<SiteSettings>({
     siteName: 'Donanım İnceleme Sitesi',
@@ -106,86 +168,170 @@ export default function SettingsPage() {
     userRegistration: true,
     affiliateTracking: true,
     seoTitle: 'Donanım İnceleme Sitesi - En İyi Donanım Rehberleri',
-    seoDescription: 'Router, modem ve ağ donanımları hakkında detaylı incelemeler ve rehberler.',
+    seoDescription:
+      'Router, modem ve ağ donanımları hakkında detaylı incelemeler ve rehberler.',
     seoKeywords: 'donanım, router, modem, wifi, inceleme',
     googleAnalytics: '',
     facebookPixel: '',
     customCss: '',
-    customJs: ''
+    customJs: '',
+    logoFile: null,
+    faviconFile: null,
+
+    // ✉️ Mail defaults
+    emailHost: '',
+    emailPort: '587',
+    emailUseTls: true,
+    emailUseSsl: false,
+    emailUser: '',
+    emailPassword: '',
+    defaultFromEmail: '',
   })
 
   const [loading, setLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState('general')
+  const [activeTab, setActiveTab] = useState<TabId>('general')
 
-  // Helper function to clear file inputs
-  const clearFileInput = (inputType: 'logo' | 'favicon') => {
-    const fileInputs = document.querySelectorAll('input[type="file"]')
-    fileInputs.forEach((input: any) => {
-      if ((inputType === 'logo' && input.accept.includes('image/*')) ||
-          (inputType === 'favicon' && input.accept.includes('image/x-icon'))) {
-        input.value = ''
-      }
-    })
-  }
+  // ✉️ Test mail state
+  const [testEmail, setTestEmail] = useState('')
+  const [testingEmail, setTestingEmail] = useState(false)
 
+  // Auth & role guard – hook, return'dan önce
   useEffect(() => {
-    fetchSettings()
+    if (status === 'loading') return
+
+    const sessionUser = session?.user as SessionUser | undefined
+
+    if (!sessionUser?.id) {
+      router.push('/auth/signin')
+      return
+    }
+
+    if (sessionUser.role !== 'SUPER_ADMIN') {
+      router.push('/admin')
+    }
+  }, [session, status, router])
+
+  // Settings fetch
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const response = await fetch('/api/admin/settings')
+        const json = (await response.json()) as SettingsApiResponse
+
+        if (!json.success || !json.data) {
+          // Hata varsa sessiz geçiyoruz; console.log yeterli
+          // eslint-disable-next-line no-console
+          console.error('Settings API error:', json.error)
+          return
+        }
+
+        const settingsData = json.data
+
+        setSettings(prev => ({
+          ...prev,
+          siteName: getVal(settingsData.general, 'site_name', 'Hardware Review'),
+          siteDescription: getVal(
+            settingsData.general,
+            'site_description',
+            'Donanım incelemeleri, karşılaştırmaları ve rehberleri ile en doğru seçimi yapın.'
+          ),
+          siteUrl: getVal(
+            settingsData.general,
+            'site_url',
+            'https://donaniminceleme.com'
+          ),
+          logo: getVal(settingsData.general, 'logo', ''),
+          favicon: getVal(settingsData.general, 'favicon', ''),
+          primaryColor: getVal(
+            settingsData.appearance,
+            'primary_color',
+            '#3b82f6'
+          ),
+          secondaryColor: getVal(
+            settingsData.appearance,
+            'secondary_color',
+            '#64748b'
+          ),
+          emailNotifications:
+            getVal(settingsData.notifications, 'email_notifications', 'true') ===
+            'true',
+          commentModeration:
+            getVal(settingsData.notifications, 'comment_moderation', 'true') ===
+            'true',
+          userRegistration:
+            getVal(settingsData.general, 'user_registration', 'true') === 'true',
+          affiliateTracking:
+            getVal(settingsData.general, 'affiliate_tracking', 'true') === 'true',
+          seoTitle: getVal(
+            settingsData.seo,
+            'seo_title',
+            'Hardware Review - En İyi Donanım Rehberleri'
+          ),
+          seoDescription: getVal(
+            settingsData.seo,
+            'seo_description',
+            'Router, modem ve ağ donanımları hakkında detaylı incelemeler ve rehberler.'
+          ),
+          seoKeywords: getVal(
+            settingsData.seo,
+            'seo_keywords',
+            'donanım, router, modem, wifi, inceleme'
+          ),
+          googleAnalytics: getVal(
+            settingsData.integrations,
+            'google_analytics',
+            ''
+          ),
+          facebookPixel: getVal(
+            settingsData.integrations,
+            'facebook_pixel',
+            ''
+          ),
+          customCss: getVal(settingsData.advanced, 'custom_css', ''),
+          customJs: getVal(settingsData.advanced, 'custom_js', ''),
+          logoFile: null,
+          faviconFile: null,
+
+          // ✉️ Mail grubu
+          emailHost: getVal(settingsData.email, 'host', ''),
+          emailPort: String(getVal(settingsData.email, 'port', '587')),
+          emailUseTls:
+            getVal(settingsData.email, 'use_tls', 'true').toString() === 'true',
+          emailUseSsl:
+            getVal(settingsData.email, 'use_ssl', 'false').toString() === 'true',
+          emailUser: getVal(settingsData.email, 'host_user', ''),
+          // Şifreyi API dönmese de biz boş bırakıyoruz
+          emailPassword: '',
+          defaultFromEmail: getVal(
+            settingsData.email,
+            'default_from_email',
+            ''
+          ),
+        }))
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Error fetching settings:', error)
+      }
+    }
+
+    void fetchSettings()
   }, [])
 
-  const fetchSettings = async () => {
-    try {
-      const response = await fetch('/api/admin/settings')
-      const data = await response.json()
-      
-      if (data.success && data.data) {
-        const settingsData = data.data
-        
-        // Map Django settings to frontend format
-        console.log('Settings data from API:', settingsData)
-        console.log('General data:', settingsData.general)
-        console.log('Site name data:', settingsData.general?.site_name)
-        
-        setSettings({
-          siteName: settingsData.general?.site_name?.value || settingsData.general?.site_name || 'Hardware Review',
-          siteDescription: settingsData.general?.site_description?.value || settingsData.general?.site_description || 'Donanım incelemeleri, karşılaştırmaları ve rehberleri ile en doğru seçimi yapın.',
-          siteUrl: settingsData.general?.site_url?.value || settingsData.general?.site_url || 'https://donaniminceleme.com',
-          logo: settingsData.general?.logo?.value || settingsData.general?.logo || '',
-          favicon: settingsData.general?.favicon?.value || settingsData.general?.favicon || '',
-          primaryColor: settingsData.appearance?.primary_color?.value || settingsData.appearance?.primary_color || '#3b82f6',
-          secondaryColor: settingsData.appearance?.secondary_color?.value || settingsData.appearance?.secondary_color || '#64748b',
-          emailNotifications: (settingsData.notifications?.email_notifications?.value || settingsData.notifications?.email_notifications) === 'true',
-          commentModeration: (settingsData.notifications?.comment_moderation?.value || settingsData.notifications?.comment_moderation) === 'true',
-          userRegistration: (settingsData.general?.user_registration?.value || settingsData.general?.user_registration) === 'true',
-          affiliateTracking: (settingsData.general?.affiliate_tracking?.value || settingsData.general?.affiliate_tracking) === 'true',
-          seoTitle: settingsData.seo?.seo_title?.value || settingsData.seo?.seo_title || 'Hardware Review - En İyi Donanım Rehberleri',
-          seoDescription: settingsData.seo?.seo_description?.value || settingsData.seo?.seo_description || 'Router, modem ve ağ donanımları hakkında detaylı incelemeler ve rehberler.',
-          seoKeywords: settingsData.seo?.seo_keywords?.value || settingsData.seo?.seo_keywords || 'donanım, router, modem, wifi, inceleme',
-          googleAnalytics: settingsData.integrations?.google_analytics?.value || settingsData.integrations?.google_analytics || '',
-          facebookPixel: settingsData.integrations?.facebook_pixel?.value || settingsData.integrations?.facebook_pixel || '',
-          customCss: settingsData.advanced?.custom_css?.value || settingsData.advanced?.custom_css || '',
-          customJs: settingsData.advanced?.custom_js?.value || settingsData.advanced?.custom_js || ''
-        })
-      }
-    } catch (error) {
-      console.error('Error fetching settings:', error)
-    }
-  }
-
-  const updateSetting = (key: keyof SiteSettings, value: any) => {
-    console.log(`Updating setting ${key} with value:`, value, typeof value)
+  const updateSetting = <K extends keyof SiteSettings>(
+    key: K,
+    value: SiteSettings[K]
+  ) => {
     setSettings(prev => ({
       ...prev,
-      [key]: value
+      [key]: value,
     }))
   }
 
   const handleSave = async () => {
     setLoading(true)
     try {
-      // Create FormData for file uploads
       const formData = new FormData()
-      
-      // Transform frontend settings to Django format
+
       const settingsData = {
         general: {
           site_name: settings.siteName,
@@ -194,6 +340,7 @@ export default function SettingsPage() {
           affiliate_tracking: settings.affiliateTracking.toString(),
           logo: settings.logoFile ? '' : settings.logo,
           favicon: settings.faviconFile ? '' : settings.favicon,
+          site_url: settings.siteUrl,
         },
         appearance: {
           primary_color: settings.primaryColor,
@@ -216,24 +363,19 @@ export default function SettingsPage() {
         advanced: {
           custom_js: settings.customJs,
         },
-      }
-      // Add logo and favicon to general settings if no file is being uploaded
-      if (!settings.logoFile) {
-        settingsData.general.logo = settings.logo
-      } else {
-        settingsData.general.logo = '' // Will be set by backend after file upload
-      }
-      
-      if (!settings.faviconFile) {
-        settingsData.general.favicon = settings.favicon
-      } else {
-        settingsData.general.favicon = '' // Will be set by backend after file upload
+        email: {
+          host: settings.emailHost,
+          port: settings.emailPort,
+          use_tls: settings.emailUseTls.toString(),
+          use_ssl: settings.emailUseSsl.toString(),
+          host_user: settings.emailUser,
+          host_password: settings.emailPassword,
+          default_from_email: settings.defaultFromEmail,
+        },
       }
 
-      // Add settings data to FormData
       formData.append('settings', JSON.stringify(settingsData))
-      
-      // Add file uploads if they exist
+
       if (settings.logoFile) {
         formData.append('logo_file', settings.logoFile)
       }
@@ -243,34 +385,135 @@ export default function SettingsPage() {
 
       const response = await fetch('/api/admin/settings', {
         method: 'POST',
-        body: formData // Don't set Content-Type header, let browser set it for FormData
+        body: formData,
       })
 
-      const data = await response.json()
-      
+      const data = (await response.json()) as SettingsApiResponse
+
       if (data.success) {
-        alert('Ayarlar başarıyla kaydedildi!')
-        // Refresh settings to get updated file URLs
-        fetchSettings()
+        // eslint-disable-next-line no-alert
+        alert(
+          'Ayarlar başarıyla kaydedildi! (Test için önce kaydedin, sonra test butonunu kullanın.)'
+        )
       } else {
         throw new Error(data.error || 'Ayarlar kaydedilemedi')
       }
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error('Error saving settings:', error)
+      // eslint-disable-next-line no-alert
       alert('Ayarlar kaydedilirken bir hata oluştu')
     } finally {
       setLoading(false)
     }
   }
 
-  const tabs = [
+  // ✉️ Test mail handler
+  const handleTestEmail = async () => {
+    if (!testEmail) {
+      // eslint-disable-next-line no-alert
+      alert('Lütfen test için bir e-posta adresi girin.')
+      return
+    }
+
+    setTestingEmail(true)
+    try {
+      const res = await fetch('/api/admin/email-test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: testEmail,
+        }),
+      })
+
+      let data: TestEmailApiResponse | null = null
+      try {
+        data = (await res.json()) as TestEmailApiResponse
+      } catch {
+        data = null
+      }
+
+      if (res.ok && data?.success) {
+        // eslint-disable-next-line no-alert
+        alert('Test e-postası gönderildi. (Gelen kutunu kontrol et)')
+      } else {
+        const msg =
+          data?.error ??
+          data?.detail ??
+          data?.message ??
+          `HTTP ${res.status} hatası`
+        // eslint-disable-next-line no-alert
+        alert('Test e-postası gönderilemedi: ' + msg)
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Error testing email:', err)
+      // eslint-disable-next-line no-alert
+      alert('Test e-postası gönderilirken bir hata oluştu')
+    } finally {
+      setTestingEmail(false)
+    }
+  }
+
+  // Hook’lardan SONRA durum kontrolü (rule-of-hooks için güvenli)
+  const isLoading = status === 'loading'
+  const sessionUser = session?.user as SessionUser | undefined
+  const isNotSuperAdmin =
+    !sessionUser || sessionUser.role !== 'SUPER_ADMIN'
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4" />
+          <p>Yetki kontrolü yapılıyor...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (isNotSuperAdmin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-red-600 mb-4">
+            Erişim Reddedildi
+          </h1>
+          <p className="text-muted-foreground mb-4">
+            Bu sayfaya erişim yetkiniz bulunmuyor. Sadece Süper Admin erişebilir.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  const tabs: Tab[] = [
     { id: 'general', label: 'Genel', icon: Settings },
     { id: 'appearance', label: 'Görünüm', icon: Palette },
     { id: 'seo', label: 'SEO', icon: Search },
     { id: 'notifications', label: 'Bildirimler', icon: Bell },
+    { id: 'email', label: 'E-posta', icon: Mail },
     { id: 'integrations', label: 'Entegrasyonlar', icon: LinkIcon },
-    { id: 'advanced', label: 'Gelişmiş', icon: Database }
+    { id: 'advanced', label: 'Gelişmiş', icon: Database },
   ]
+
+  // Helper function to clear file inputs
+  const clearFileInput = (inputType: 'logo' | 'favicon') => {
+    const fileInputs =
+      document.querySelectorAll<HTMLInputElement>('input[type="file"]')
+    fileInputs.forEach(input => {
+      if (inputType === 'logo' && input.accept.includes('image/*')) {
+        // eslint-disable-next-line no-param-reassign
+        input.value = ''
+      }
+      if (inputType === 'favicon' && input.accept.includes('image/x-icon')) {
+        // eslint-disable-next-line no-param-reassign
+        input.value = ''
+      }
+    })
+  }
 
   return (
     <div className="container py-8">
@@ -287,7 +530,7 @@ export default function SettingsPage() {
           <Card>
             <CardContent className="pt-6">
               <div className="space-y-2">
-                {tabs.map((tab) => {
+                {tabs.map(tab => {
                   const Icon = tab.icon
                   return (
                     <Button
@@ -319,54 +562,75 @@ export default function SettingsPage() {
               {activeTab === 'general' && (
                 <div className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Site Adı</label>
+                    <label className="text-sm font-medium mb-2 block">
+                      Site Adı
+                    </label>
                     <Input
-                      value={typeof settings.siteName === 'string' ? settings.siteName : ''}
-                      onChange={(e) => updateSetting('siteName', e.target.value)}
+                      value={settings.siteName}
+                      onChange={e => updateSetting('siteName', e.target.value)}
                       placeholder="Site adını girin..."
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      Header ve footer'da görüntülenecek site adı
+                      Header ve footer&apos;da görüntülenecek site adı
                     </p>
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Site Açıklaması</label>
+                    <label className="text-sm font-medium mb-2 block">
+                      Site Açıklaması
+                    </label>
                     <Textarea
-                      value={typeof settings.siteDescription === 'string' ? settings.siteDescription : ''}
-                      onChange={(e) => updateSetting('siteDescription', e.target.value)}
+                      value={settings.siteDescription}
+                      onChange={e =>
+                        updateSetting('siteDescription', e.target.value)
+                      }
                       placeholder="Site açıklamasını girin..."
                       rows={3}
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      Footer'da görüntülenecek site açıklaması
+                      Footer&apos;da görüntülenecek site açıklaması
                     </p>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">
+                      Site URL&apos;si
+                    </label>
+                    <Input
+                      value={settings.siteUrl}
+                      onChange={e => updateSetting('siteUrl', e.target.value)}
+                      placeholder="https://donanimpuani.com"
+                    />
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="text-sm font-medium mb-2 block">Logo</label>
+                      <label className="text-sm font-medium mb-2 block">
+                        Logo
+                      </label>
                       <div className="space-y-2">
                         <input
                           type="file"
                           accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0]
-                            if (file) {
-                              updateSetting('logoFile', file)
-                            }
+                          onChange={e => {
+                            const file = e.target.files?.[0] ?? null
+                            updateSetting('logoFile', file)
                           }}
                           className="w-full p-2 border border-gray-300 rounded-md text-sm"
                         />
-                        {settings.logo && typeof settings.logo === 'string' && (
+                        {settings.logo && (
                           <div className="flex items-center justify-between p-2 bg-gray-50 rounded-md">
                             <div className="flex items-center space-x-2">
-                              <img 
-                                src={settings.logo.startsWith('/media/') ? `http://localhost:8000${settings.logo}` : settings.logo} 
-                                alt="Current logo" 
+                              <Image
+                                src={resolveMediaUrl(settings.logo)}
+                                alt="Current logo"
+                                width={32}
+                                height={32}
                                 className="w-8 h-8 object-contain"
                               />
-                              <span className="text-xs text-muted-foreground">Mevcut logo</span>
+                              <span className="text-xs text-muted-foreground">
+                                Mevcut logo
+                              </span>
                             </div>
                             <Button
                               type="button"
@@ -386,32 +650,36 @@ export default function SettingsPage() {
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Header ve footer'daki mavi karenin yerine geçecek logo
+                        Header ve footer&apos;daki mavi karenin yerine geçecek logo
                       </p>
                     </div>
                     <div>
-                      <label className="text-sm font-medium mb-2 block">Favicon</label>
+                      <label className="text-sm font-medium mb-2 block">
+                        Favicon
+                      </label>
                       <div className="space-y-2">
                         <input
                           type="file"
                           accept="image/x-icon,image/png,image/jpeg,image/gif"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0]
-                            if (file) {
-                              updateSetting('faviconFile', file)
-                            }
+                          onChange={e => {
+                            const file = e.target.files?.[0] ?? null
+                            updateSetting('faviconFile', file)
                           }}
                           className="w-full p-2 border border-gray-300 rounded-md text-sm"
                         />
-                        {settings.favicon && typeof settings.favicon === 'string' && (
+                        {settings.favicon && (
                           <div className="flex items-center justify-between p-2 bg-gray-50 rounded-md">
                             <div className="flex items-center space-x-2">
-                              <img 
-                                src={settings.favicon.startsWith('/media/') ? `http://localhost:8000${settings.favicon}` : settings.favicon} 
-                                alt="Current favicon" 
+                              <Image
+                                src={resolveMediaUrl(settings.favicon)}
+                                alt="Current favicon"
+                                width={16}
+                                height={16}
                                 className="w-4 h-4 object-contain"
                               />
-                              <span className="text-xs text-muted-foreground">Mevcut favicon</span>
+                              <span className="text-xs text-muted-foreground">
+                                Mevcut favicon
+                              </span>
                             </div>
                             <Button
                               type="button"
@@ -431,7 +699,7 @@ export default function SettingsPage() {
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Sitenin favicon'u (.ico, .png, .jpg)
+                        Sitenin favicon&apos;u (.ico, .png, .jpg)
                       </p>
                     </div>
                   </div>
@@ -441,9 +709,14 @@ export default function SettingsPage() {
                       type="checkbox"
                       id="userRegistration"
                       checked={settings.userRegistration}
-                      onChange={(e) => updateSetting('userRegistration', e.target.checked)}
+                      onChange={e =>
+                        updateSetting('userRegistration', e.target.checked)
+                      }
                     />
-                    <label htmlFor="userRegistration" className="text-sm font-medium">
+                    <label
+                      htmlFor="userRegistration"
+                      className="text-sm font-medium"
+                    >
                       Kullanıcı kaydına izin ver
                     </label>
                   </div>
@@ -456,9 +729,14 @@ export default function SettingsPage() {
                       type="checkbox"
                       id="affiliateTracking"
                       checked={settings.affiliateTracking}
-                      onChange={(e) => updateSetting('affiliateTracking', e.target.checked)}
+                      onChange={e =>
+                        updateSetting('affiliateTracking', e.target.checked)
+                      }
                     />
-                    <label htmlFor="affiliateTracking" className="text-sm font-medium">
+                    <label
+                      htmlFor="affiliateTracking"
+                      className="text-sm font-medium"
+                    >
                       Affiliate takibi aktif
                     </label>
                   </div>
@@ -473,33 +751,45 @@ export default function SettingsPage() {
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="text-sm font-medium mb-2 block">Ana Renk</label>
+                      <label className="text-sm font-medium mb-2 block">
+                        Ana Renk
+                      </label>
                       <div className="flex gap-2">
                         <Input
                           type="color"
-                          value={typeof settings.primaryColor === 'string' ? settings.primaryColor : '#3b82f6'}
-                          onChange={(e) => updateSetting('primaryColor', e.target.value)}
+                          value={settings.primaryColor}
+                          onChange={e =>
+                            updateSetting('primaryColor', e.target.value)
+                          }
                           className="w-16 h-10"
                         />
                         <Input
-                          value={typeof settings.primaryColor === 'string' ? settings.primaryColor : '#3b82f6'}
-                          onChange={(e) => updateSetting('primaryColor', e.target.value)}
+                          value={settings.primaryColor}
+                          onChange={e =>
+                            updateSetting('primaryColor', e.target.value)
+                          }
                           placeholder="#3b82f6"
                         />
                       </div>
                     </div>
                     <div>
-                      <label className="text-sm font-medium mb-2 block">İkincil Renk</label>
+                      <label className="text-sm font-medium mb-2 block">
+                        İkincil Renk
+                      </label>
                       <div className="flex gap-2">
                         <Input
                           type="color"
-                          value={typeof settings.secondaryColor === 'string' ? settings.secondaryColor : '#64748b'}
-                          onChange={(e) => updateSetting('secondaryColor', e.target.value)}
+                          value={settings.secondaryColor}
+                          onChange={e =>
+                            updateSetting('secondaryColor', e.target.value)
+                          }
                           className="w-16 h-10"
                         />
                         <Input
-                          value={typeof settings.secondaryColor === 'string' ? settings.secondaryColor : '#64748b'}
-                          onChange={(e) => updateSetting('secondaryColor', e.target.value)}
+                          value={settings.secondaryColor}
+                          onChange={e =>
+                            updateSetting('secondaryColor', e.target.value)
+                          }
                           placeholder="#64748b"
                         />
                       </div>
@@ -507,10 +797,12 @@ export default function SettingsPage() {
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Özel CSS</label>
+                    <label className="text-sm font-medium mb-2 block">
+                      Özel CSS
+                    </label>
                     <Textarea
-                      value={typeof settings.customCss === 'string' ? settings.customCss : ''}
-                      onChange={(e) => updateSetting('customCss', e.target.value)}
+                      value={settings.customCss}
+                      onChange={e => updateSetting('customCss', e.target.value)}
                       placeholder="/* Özel CSS kodlarınızı buraya yazın */"
                       rows={8}
                       className="font-mono text-sm"
@@ -523,35 +815,45 @@ export default function SettingsPage() {
               {activeTab === 'seo' && (
                 <div className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium mb-2 block">SEO Başlığı</label>
+                    <label className="text-sm font-medium mb-2 block">
+                      SEO Başlığı
+                    </label>
                     <Input
-                      value={typeof settings.seoTitle === 'string' ? settings.seoTitle : ''}
-                      onChange={(e) => updateSetting('seoTitle', e.target.value)}
+                      value={settings.seoTitle}
+                      onChange={e => updateSetting('seoTitle', e.target.value)}
                       placeholder="SEO başlığı (60 karakter önerilen)"
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      {typeof settings.seoTitle === 'string' ? settings.seoTitle.length : 0}/60 karakter
+                      {settings.seoTitle.length}/60 karakter
                     </p>
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium mb-2 block">SEO Açıklaması</label>
+                    <label className="text-sm font-medium mb-2 block">
+                      SEO Açıklaması
+                    </label>
                     <Textarea
-                      value={typeof settings.seoDescription === 'string' ? settings.seoDescription : ''}
-                      onChange={(e) => updateSetting('seoDescription', e.target.value)}
+                      value={settings.seoDescription}
+                      onChange={e =>
+                        updateSetting('seoDescription', e.target.value)
+                      }
                       placeholder="SEO açıklaması (160 karakter önerilen)"
                       rows={3}
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      {typeof settings.seoDescription === 'string' ? settings.seoDescription.length : 0}/160 karakter
+                      {settings.seoDescription.length}/160 karakter
                     </p>
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Anahtar Kelimeler</label>
+                    <label className="text-sm font-medium mb-2 block">
+                      Anahtar Kelimeler
+                    </label>
                     <Input
-                      value={typeof settings.seoKeywords === 'string' ? settings.seoKeywords : ''}
-                      onChange={(e) => updateSetting('seoKeywords', e.target.value)}
+                      value={settings.seoKeywords}
+                      onChange={e =>
+                        updateSetting('seoKeywords', e.target.value)
+                      }
                       placeholder="donanım, router, modem, wifi, inceleme"
                     />
                     <p className="text-xs text-muted-foreground mt-1">
@@ -569,9 +871,14 @@ export default function SettingsPage() {
                       type="checkbox"
                       id="emailNotifications"
                       checked={settings.emailNotifications}
-                      onChange={(e) => updateSetting('emailNotifications', e.target.checked)}
+                      onChange={e =>
+                        updateSetting('emailNotifications', e.target.checked)
+                      }
                     />
-                    <label htmlFor="emailNotifications" className="text-sm font-medium">
+                    <label
+                      htmlFor="emailNotifications"
+                      className="text-sm font-medium"
+                    >
                       Email bildirimleri aktif
                     </label>
                   </div>
@@ -581,11 +888,148 @@ export default function SettingsPage() {
                       type="checkbox"
                       id="commentModeration"
                       checked={settings.commentModeration}
-                      onChange={(e) => updateSetting('commentModeration', e.target.checked)}
+                      onChange={e =>
+                        updateSetting('commentModeration', e.target.checked)
+                      }
                     />
-                    <label htmlFor="commentModeration" className="text-sm font-medium">
+                    <label
+                      htmlFor="commentModeration"
+                      className="text-sm font-medium"
+                    >
                       Yorum moderasyonu aktif
                     </label>
+                  </div>
+                </div>
+              )}
+
+              {/* ✉️ Email Settings */}
+              {activeTab === 'email' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">
+                        SMTP Host
+                      </label>
+                      <Input
+                        value={settings.emailHost}
+                        onChange={e =>
+                          updateSetting('emailHost', e.target.value)
+                        }
+                        placeholder="smtpout.secureserver.net"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">
+                        SMTP Port
+                      </label>
+                      <Input
+                        type="number"
+                        value={settings.emailPort}
+                        onChange={e =>
+                          updateSetting('emailPort', e.target.value)
+                        }
+                        placeholder="587"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-4">
+                    <label className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={settings.emailUseTls}
+                        onChange={e =>
+                          updateSetting('emailUseTls', e.target.checked)
+                        }
+                      />
+                      <span className="text-sm font-medium">TLS (STARTTLS)</span>
+                    </label>
+                    <label className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={settings.emailUseSsl}
+                        onChange={e =>
+                          updateSetting('emailUseSsl', e.target.checked)
+                        }
+                      />
+                      <span className="text-sm font-medium">SSL (465)</span>
+                    </label>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Genelde 587 + TLS veya 465 + SSL kullanılır. İkisini aynı anda
+                    aktif yapmayın.
+                  </p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">
+                        SMTP Kullanıcı Adı
+                      </label>
+                      <Input
+                        value={settings.emailUser}
+                        onChange={e =>
+                          updateSetting('emailUser', e.target.value)
+                        }
+                        placeholder="info@..."
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">
+                        SMTP Şifresi
+                      </label>
+                      <Input
+                        type="password"
+                        value={settings.emailPassword}
+                        onChange={e =>
+                          updateSetting('emailPassword', e.target.value)
+                        }
+                        placeholder="••••••••"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Boş bırakırsanız backend mevcut şifreyi koruyabilir (o
+                        şekilde implemente edebiliriz).
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">
+                      Varsayılan Gönderen (From)
+                    </label>
+                    <Input
+                      value={settings.defaultFromEmail}
+                      onChange={e =>
+                        updateSetting('defaultFromEmail', e.target.value)
+                      }
+                      placeholder='Donanım Puanı <info@...>'
+                    />
+                  </div>
+
+                  {/* ✉️ Test Mail Alanı */}
+                  <div className="mt-6 border-t pt-4 space-y-3">
+                    <p className="text-sm font-medium">Test E-postası Gönder</p>
+                    <p className="text-xs text-muted-foreground">
+                      Aşağıya bir e-posta adresi girin ve güncel ayarlarla test maili
+                      gönderin. <strong>Öneri:</strong> Önce &quot;Ayarları Kaydet&quot;
+                      butonuna basın, ardından test yapın.
+                    </p>
+                    <div className="flex flex-col md:flex-row gap-2">
+                      <Input
+                        type="email"
+                        value={testEmail}
+                        onChange={e => setTestEmail(e.target.value)}
+                        placeholder="ornek@mail.com"
+                        className="md:flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleTestEmail}
+                        disabled={testingEmail || !testEmail}
+                      >
+                        {testingEmail ? 'Test gönderiliyor...' : 'Test mail gönder'}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -594,19 +1038,27 @@ export default function SettingsPage() {
               {activeTab === 'integrations' && (
                 <div className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Google Analytics ID</label>
+                    <label className="text-sm font-medium mb-2 block">
+                      Google Analytics ID
+                    </label>
                     <Input
-                      value={typeof settings.googleAnalytics === 'string' ? settings.googleAnalytics : ''}
-                      onChange={(e) => updateSetting('googleAnalytics', e.target.value)}
+                      value={settings.googleAnalytics}
+                      onChange={e =>
+                        updateSetting('googleAnalytics', e.target.value)
+                      }
                       placeholder="G-XXXXXXXXXX"
                     />
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Facebook Pixel ID</label>
+                    <label className="text-sm font-medium mb-2 block">
+                      Facebook Pixel ID
+                    </label>
                     <Input
-                      value={typeof settings.facebookPixel === 'string' ? settings.facebookPixel : ''}
-                      onChange={(e) => updateSetting('facebookPixel', e.target.value)}
+                      value={settings.facebookPixel}
+                      onChange={e =>
+                        updateSetting('facebookPixel', e.target.value)
+                      }
                       placeholder="123456789012345"
                     />
                   </div>
@@ -617,10 +1069,12 @@ export default function SettingsPage() {
               {activeTab === 'advanced' && (
                 <div className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Özel JavaScript</label>
+                    <label className="text-sm font-medium mb-2 block">
+                      Özel JavaScript
+                    </label>
                     <Textarea
-                      value={typeof settings.customJs === 'string' ? settings.customJs : ''}
-                      onChange={(e) => updateSetting('customJs', e.target.value)}
+                      value={settings.customJs}
+                      onChange={e => updateSetting('customJs', e.target.value)}
                       placeholder="// Özel JavaScript kodlarınızı buraya yazın"
                       rows={8}
                       className="font-mono text-sm"
@@ -633,7 +1087,8 @@ export default function SettingsPage() {
                       <span className="font-medium">Dikkat!</span>
                     </div>
                     <p className="text-sm text-yellow-700 mt-2">
-                      Gelişmiş ayarları değiştirirken dikkatli olun. Yanlış kodlar site işlevselliğini bozabilir.
+                      Gelişmiş ayarları değiştirirken dikkatli olun. Yanlış kodlar
+                      site işlevselliğini bozabilir.
                     </p>
                   </div>
                 </div>
