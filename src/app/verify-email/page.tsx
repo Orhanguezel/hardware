@@ -1,90 +1,117 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { CheckCircle, XCircle, Loader2, Mail } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { CheckCircle, XCircle, Loader2, Mail } from "lucide-react";
+import { DJANGO_API_URL } from "@/lib/api";
+
+type VerifyStatus = "loading" | "success" | "error" | "expired";
+
+interface VerifiedUser {
+  email: string;
+  [key: string]: unknown;
+}
 
 export default function VerifyEmailPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'expired'>('loading');
-  const [message, setMessage] = useState('');
-  const [user, setUser] = useState<any>(null);
+
+  const [status, setStatus] = useState<VerifyStatus>("loading");
+  const [message, setMessage] = useState("");
+  const [user, setUser] = useState<VerifiedUser | null>(null);
 
   useEffect(() => {
-    const token = searchParams.get('token');
-    const email = searchParams.get('email');
+    const token = searchParams.get("token");
+    const email = searchParams.get("email");
 
     if (!token || !email) {
-      setStatus('error');
-      setMessage('Geçersiz doğrulama linki');
+      setStatus("error");
+      setMessage("Geçersiz doğrulama linki");
       return;
     }
 
-    verifyEmail(token, email);
-  }, [searchParams]);
+    const run = async () => {
+      try {
+        const response = await fetch(
+          `${DJANGO_API_URL}/auth/verify-email/`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ token, email }),
+          }
+        );
 
-  const verifyEmail = async (token: string, email: string) => {
-    try {
-      const response = await fetch('http://localhost:8000/api/auth/verify-email/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ token, email }),
-      });
+        const data = await response.json();
 
-      const data = await response.json();
+        if (data.success) {
+          setStatus("success");
+          setMessage(data.message || "E-posta adresiniz doğrulandı.");
+          if (data.user && typeof data.user.email === "string") {
+            setUser({ email: data.user.email, ...data.user });
+          }
 
-      if (data.success) {
-        setStatus('success');
-        setMessage(data.message);
-        setUser(data.user);
-        
-        // Redirect to login after 3 seconds
-        setTimeout(() => {
-          router.push('/auth/login');
-        }, 3000);
-      } else {
-        if (data.error.includes('süresi dolmuş')) {
-          setStatus('expired');
+          // 3 saniye sonra login sayfasına yönlendir
+          setTimeout(() => {
+            router.push("/auth/login"); // veya /auth/signin kullanıyorsan burayı değiştir
+          }, 3000);
         } else {
-          setStatus('error');
+          const errorMsg: string =
+            data.error || "Doğrulama işlemi başarısız oldu";
+          if (errorMsg.includes("süresi dolmuş")) {
+            setStatus("expired");
+          } else {
+            setStatus("error");
+          }
+          setMessage(errorMsg);
         }
-        setMessage(data.error);
+      } catch (error) {
+        console.error("Verification error:", error);
+        setStatus("error");
+        setMessage("Doğrulama sırasında bir hata oluştu");
       }
-    } catch (error) {
-      console.error('Verification error:', error);
-      setStatus('error');
-      setMessage('Doğrulama sırasında bir hata oluştu');
-    }
-  };
+    };
+
+    void run();
+  }, [searchParams, router]);
 
   const resendVerification = async () => {
     if (!user?.email) return;
-    
+
     try {
-      const response = await fetch('http://localhost:8000/api/auth/resend-verification/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Token ${localStorage.getItem('token')}`,
-        },
-      });
+      const response = await fetch(
+        `${DJANGO_API_URL}/auth/resend-verification/`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email: user.email }),
+        }
+      );
 
       const data = await response.json();
 
       if (data.success) {
-        setMessage('Doğrulama e-postası tekrar gönderildi');
+        setMessage("Doğrulama e-postası tekrar gönderildi");
       } else {
-        setMessage(data.error);
+        setMessage(
+          data.error || "Doğrulama e-postası gönderilemedi"
+        );
       }
     } catch (error) {
-      console.error('Resend error:', error);
-      setMessage('E-posta gönderilemedi');
+      console.error("Resend error:", error);
+      setMessage("E-posta gönderilemedi");
     }
   };
 
@@ -103,26 +130,30 @@ export default function VerifyEmailPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-center">
-              {status === 'loading' && 'Doğrulanıyor...'}
-              {status === 'success' && 'Doğrulama Başarılı!'}
-              {status === 'error' && 'Doğrulama Hatası'}
-              {status === 'expired' && 'Link Süresi Dolmuş'}
+              {status === "loading" && "Doğrulanıyor..."}
+              {status === "success" && "Doğrulama Başarılı!"}
+              {status === "error" && "Doğrulama Hatası"}
+              {status === "expired" && "Link Süresi Dolmuş"}
             </CardTitle>
             <CardDescription className="text-center">
-              {status === 'loading' && 'E-posta adresiniz doğrulanıyor, lütfen bekleyin...'}
-              {status === 'success' && 'E-posta adresiniz başarıyla doğrulandı'}
-              {status === 'error' && 'Doğrulama işlemi başarısız oldu'}
-              {status === 'expired' && 'Doğrulama linkinin süresi dolmuş'}
+              {status === "loading" &&
+                "E-posta adresiniz doğrulanıyor, lütfen bekleyin..."}
+              {status === "success" &&
+                "E-posta adresiniz başarıyla doğrulandı"}
+              {status === "error" &&
+                "Doğrulama işlemi başarısız oldu"}
+              {status === "expired" &&
+                "Doğrulama linkinin süresi dolmuş"}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {status === 'loading' && (
+            {status === "loading" && (
               <div className="flex justify-center">
                 <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
               </div>
             )}
 
-            {status === 'success' && (
+            {status === "success" && (
               <Alert className="border-green-200 bg-green-50">
                 <CheckCircle className="h-4 w-4 text-green-600" />
                 <AlertDescription className="text-green-800">
@@ -131,7 +162,7 @@ export default function VerifyEmailPage() {
               </Alert>
             )}
 
-            {(status === 'error' || status === 'expired') && (
+            {(status === "error" || status === "expired") && (
               <Alert className="border-red-200 bg-red-50">
                 <XCircle className="h-4 w-4 text-red-600" />
                 <AlertDescription className="text-red-800">
@@ -140,18 +171,19 @@ export default function VerifyEmailPage() {
               </Alert>
             )}
 
-            {status === 'success' && (
+            {status === "success" && (
               <div className="text-center text-sm text-gray-600">
                 <p>3 saniye sonra giriş sayfasına yönlendirileceksiniz...</p>
               </div>
             )}
 
-            {status === 'expired' && (
+            {status === "expired" && (
               <div className="space-y-4">
                 <p className="text-sm text-gray-600 text-center">
-                  Doğrulama linkinin süresi dolmuş. Yeni bir doğrulama e-postası gönderebilirsiniz.
+                  Doğrulama linkinin süresi dolmuş. Yeni bir doğrulama
+                  e-postası gönderebilirsiniz.
                 </p>
-                <Button 
+                <Button
                   onClick={resendVerification}
                   className="w-full"
                   variant="outline"
@@ -162,12 +194,12 @@ export default function VerifyEmailPage() {
               </div>
             )}
 
-            {status === 'error' && (
+            {status === "error" && (
               <div className="space-y-4">
                 <p className="text-sm text-gray-600 text-center">
                   Doğrulama işlemi başarısız oldu. Lütfen tekrar deneyin.
                 </p>
-                <Button 
+                <Button
                   onClick={() => window.location.reload()}
                   className="w-full"
                   variant="outline"
@@ -178,9 +210,9 @@ export default function VerifyEmailPage() {
             )}
 
             <div className="text-center">
-              <Button 
-                variant="link" 
-                onClick={() => router.push('/auth/login')}
+              <Button
+                variant="link"
+                onClick={() => router.push("/auth/login")}
                 className="text-blue-600"
               >
                 Giriş Sayfasına Dön

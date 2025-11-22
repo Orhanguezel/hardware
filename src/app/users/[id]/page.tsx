@@ -5,21 +5,18 @@ import { useParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
+import Image from 'next/image'
 import { 
   User, 
-  Mail, 
-  Calendar, 
+  Mail,
   MessageCircle, 
   Heart,
   Star,
   FileText,
-  Package,
   ArrowLeft,
   ArrowRight
 } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 
 interface UserProfile {
   id: string
@@ -62,7 +59,6 @@ interface UserProfile {
 
 export default function UserProfilePage() {
   const params = useParams()
-  const router = useRouter()
   const [user, setUser] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -106,7 +102,7 @@ export default function UserProfilePage() {
     })
   }
 
-  const getArticleUrl = (article: any) => {
+  const getArticleUrl = (article: { type: string; slug: string }) => {
     switch (article.type) {
       case 'REVIEW':
         return `/reviews/${article.slug}`
@@ -171,7 +167,7 @@ export default function UserProfilePage() {
             <div className="flex-shrink-0">
               <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center overflow-hidden">
                 {user.avatar ? (
-                  <img 
+                  <Image
                     src={`http://localhost:8000${user.avatar}`} 
                     alt={user.name} 
                     className="w-full h-full object-cover" 
