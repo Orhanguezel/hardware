@@ -1,8 +1,8 @@
-"use client";
+// app/verify-email/page.tsx
 
-import { useState, useEffect } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
+import { CheckCircle, XCircle, Mail } from "lucide-react";
+import Link from "next/link";
+import { DJANGO_API_URL } from "@/lib/api";
 import {
   Card,
   CardContent,
@@ -11,109 +11,81 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle, XCircle, Loader2, Mail } from "lucide-react";
-import { DJANGO_API_URL } from "@/lib/api";
+import { Button } from "@/components/ui/button";
 
-type VerifyStatus = "loading" | "success" | "error" | "expired";
+// Bu sayfa tamamen dinamik çalışsın, build sırasında pre-render denemesin
+export const dynamic = "force-dynamic";
 
-interface VerifiedUser {
-  email: string;
-  [key: string]: unknown;
-}
+type VerifyStatus = "success" | "error" | "expired";
 
-export default function VerifyEmailPage() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
+export default async function VerifyEmailPage({
+  searchParams,
+}: {
+  // Next'in PageProps beklentisiyle uyumlu: searchParams bir Promise
+  searchParams: Promise<{ token?: string; email?: string }>;
+}) {
+  const resolved = await searchParams;
+  const token = resolved.token;
+  const email = resolved.email;
 
-  const [status, setStatus] = useState<VerifyStatus>("loading");
-  const [message, setMessage] = useState("");
-  const [user, setUser] = useState<VerifiedUser | null>(null);
+  let status: VerifyStatus;
+  let message = "";
+  let userEmail: string | null = null;
 
-  useEffect(() => {
-    const token = searchParams.get("token");
-    const email = searchParams.get("email");
-
-    if (!token || !email) {
-      setStatus("error");
-      setMessage("Geçersiz doğrulama linki");
-      return;
-    }
-
-    const run = async () => {
-      try {
-        const response = await fetch(
-          `${DJANGO_API_URL}/auth/verify-email/`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ token, email }),
-          }
-        );
-
-        const data = await response.json();
-
-        if (data.success) {
-          setStatus("success");
-          setMessage(data.message || "E-posta adresiniz doğrulandı.");
-          if (data.user && typeof data.user.email === "string") {
-            setUser({ email: data.user.email, ...data.user });
-          }
-
-          // 3 saniye sonra login sayfasına yönlendir
-          setTimeout(() => {
-            router.push("/auth/login"); // veya /auth/signin kullanıyorsan burayı değiştir
-          }, 3000);
-        } else {
-          const errorMsg: string =
-            data.error || "Doğrulama işlemi başarısız oldu";
-          if (errorMsg.includes("süresi dolmuş")) {
-            setStatus("expired");
-          } else {
-            setStatus("error");
-          }
-          setMessage(errorMsg);
-        }
-      } catch (error) {
-        console.error("Verification error:", error);
-        setStatus("error");
-        setMessage("Doğrulama sırasında bir hata oluştu");
-      }
-    };
-
-    void run();
-  }, [searchParams, router]);
-
-  const resendVerification = async () => {
-    if (!user?.email) return;
-
+  if (!token || !email) {
+    status = "error";
+    message = "Geçersiz doğrulama linki";
+  } else {
     try {
-      const response = await fetch(
-        `${DJANGO_API_URL}/auth/resend-verification/`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ email: user.email }),
-        }
-      );
+      const res = await fetch(`${DJANGO_API_URL}/auth/verify-email/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        cache: "no-store",
+        body: JSON.stringify({ token, email }),
+      });
 
-      const data = await response.json();
+      const data = await res.json();
 
       if (data.success) {
-        setMessage("Doğrulama e-postası tekrar gönderildi");
+        status = "success";
+        message = data.message || "E-posta adresiniz başarıyla doğrulandı.";
+        if (data.user?.email && typeof data.user.email === "string") {
+          userEmail = data.user.email;
+        }
       } else {
-        setMessage(
-          data.error || "Doğrulama e-postası gönderilemedi"
-        );
+        const errorMsg: string =
+          data.error || "Doğrulama işlemi başarısız oldu";
+
+        if (errorMsg.includes("süresi dolmuş")) {
+          status = "expired";
+        } else {
+          status = "error";
+        }
+
+        message = errorMsg;
       }
-    } catch (error) {
-      console.error("Resend error:", error);
-      setMessage("E-posta gönderilemedi");
+    } catch (err) {
+      console.error("Verification error:", err);
+      status = "error";
+      message = "Doğrulama sırasında bir hata oluştu";
     }
-  };
+  }
+
+  const title =
+    status === "success"
+      ? "Doğrulama Başarılı!"
+      : status === "expired"
+      ? "Link Süresi Dolmuş"
+      : "Doğrulama Hatası";
+
+  const description =
+    status === "success"
+      ? "E-posta adresiniz başarıyla doğrulandı"
+      : status === "expired"
+      ? "Doğrulama linkinin süresi dolmuş"
+      : "Doğrulama işlemi başarısız oldu";
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -129,30 +101,13 @@ export default function VerifyEmailPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-center">
-              {status === "loading" && "Doğrulanıyor..."}
-              {status === "success" && "Doğrulama Başarılı!"}
-              {status === "error" && "Doğrulama Hatası"}
-              {status === "expired" && "Link Süresi Dolmuş"}
-            </CardTitle>
+            <CardTitle className="text-center">{title}</CardTitle>
             <CardDescription className="text-center">
-              {status === "loading" &&
-                "E-posta adresiniz doğrulanıyor, lütfen bekleyin..."}
-              {status === "success" &&
-                "E-posta adresiniz başarıyla doğrulandı"}
-              {status === "error" &&
-                "Doğrulama işlemi başarısız oldu"}
-              {status === "expired" &&
-                "Doğrulama linkinin süresi dolmuş"}
+              {description}
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {status === "loading" && (
-              <div className="flex justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-              </div>
-            )}
 
+          <CardContent className="space-y-4">
             {status === "success" && (
               <Alert className="border-green-200 bg-green-50">
                 <CheckCircle className="h-4 w-4 text-green-600" />
@@ -171,51 +126,21 @@ export default function VerifyEmailPage() {
               </Alert>
             )}
 
-            {status === "success" && (
-              <div className="text-center text-sm text-gray-600">
-                <p>3 saniye sonra giriş sayfasına yönlendirileceksiniz...</p>
-              </div>
-            )}
-
-            {status === "expired" && (
+            {status === "expired" && userEmail && (
               <div className="space-y-4">
                 <p className="text-sm text-gray-600 text-center">
                   Doğrulama linkinin süresi dolmuş. Yeni bir doğrulama
                   e-postası gönderebilirsiniz.
                 </p>
-                <Button
-                  onClick={resendVerification}
-                  className="w-full"
-                  variant="outline"
-                >
-                  <Mail className="h-4 w-4 mr-2" />
-                  Yeni Doğrulama E-postası Gönder
-                </Button>
-              </div>
-            )}
-
-            {status === "error" && (
-              <div className="space-y-4">
-                <p className="text-sm text-gray-600 text-center">
-                  Doğrulama işlemi başarısız oldu. Lütfen tekrar deneyin.
+                <p className="text-xs text-gray-500 text-center">
+                  Hesap: <span className="font-mono">{userEmail}</span>
                 </p>
-                <Button
-                  onClick={() => window.location.reload()}
-                  className="w-full"
-                  variant="outline"
-                >
-                  Tekrar Dene
-                </Button>
               </div>
             )}
 
             <div className="text-center">
-              <Button
-                variant="link"
-                onClick={() => router.push("/auth/login")}
-                className="text-blue-600"
-              >
-                Giriş Sayfasına Dön
+              <Button asChild className="w-full">
+                <Link href="/auth/login">Giriş Sayfasına Dön</Link>
               </Button>
             </div>
           </CardContent>
