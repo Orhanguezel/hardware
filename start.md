@@ -21,4 +21,8 @@ Kullanıcı adı: Donanımpuani.com
 Password: PgAdmin2025!
 Password (again): PgAdmin2025!
 Superuser created successfully.
-(venv) root@srv1143087:/var/www/hardware/backend# 
+(venv) root@srv1143087:/var/www/hardware/backend#
+
+
+rm -rf dist .tsbuildinfo
+bun run build

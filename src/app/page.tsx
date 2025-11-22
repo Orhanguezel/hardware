@@ -1,7 +1,7 @@
-import { HeroSection } from '@/components/sections/hero-section'
-import { FeaturedReviews } from '@/components/sections/featured-reviews'
-import { LatestArticles } from '@/components/sections/latest-articles'
-import { NewsletterSignup } from '@/components/sections/newsletter-signup'
+import { HeroSection } from "@/components/sections/hero-section";
+import { FeaturedReviews } from "@/components/sections/featured-reviews";
+import { LatestArticles } from "@/components/sections/latest-articles";
+import { NewsletterSignup } from "@/components/sections/newsletter-signup";
 
 export default async function HomePage() {
   return (
@@ -19,5 +19,5 @@ export default async function HomePage() {
         <NewsletterSignup />
       </div>
     </div>
-  )
+  );
 }
