@@ -25,21 +25,27 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSettings } from '@/contexts/SettingsContext'
 
-interface Category {
-  id: string
+/* ---------- Category tipleri ---------- */
+
+// Django API’den gelen ham kategori tipi (flat)
+interface RawCategory {
+  id: number
   name: string
   slug: string
-  children: {
-    id: string
-    name: string
-    slug: string
-    _count: {
-      articles: number
-    }
-  }[]
-  _count: {
-    articles: number
-  }
+  parent: number | null
+  description?: string
+  icon?: string
+  color?: string
+  is_active?: boolean
+  sort_order?: number
+}
+
+// Header’da kullanacağımız ağaç tipi
+interface CategoryNode {
+  id: number
+  name: string
+  slug: string
+  children: CategoryNode[]
 }
 
 /* ---------- Search result tipleri ---------- */
@@ -76,7 +82,10 @@ interface UserSearchResult {
   role?: string
 }
 
-type SearchResultItem = ArticleSearchResult | ProductSearchResult | UserSearchResult
+type SearchResultItem =
+  | ArticleSearchResult
+  | ProductSearchResult
+  | UserSearchResult
 
 interface SearchApiResponse {
   success: boolean
@@ -109,12 +118,46 @@ interface SearchApiResponse {
   }
 }
 
+/* ---------- Flat listeyi ağaç yapısına çeviren helper ---------- */
+
+function buildCategoryTree(raw: RawCategory[]): CategoryNode[] {
+  const map = new Map<number, CategoryNode>()
+  const roots: CategoryNode[] = []
+
+  // Tüm kategorileri map’e koy
+  raw.forEach((c) => {
+    map.set(c.id, {
+      id: c.id,
+      name: c.name,
+      slug: c.slug,
+      children: [],
+    })
+  })
+
+  // Parent ilişkisine göre ağaç oluştur
+  raw.forEach((c) => {
+    const node = map.get(c.id)!
+    if (c.parent && map.has(c.parent)) {
+      const parent = map.get(c.parent)!
+      parent.children.push(node)
+    } else {
+      // parent yoksa root kategori
+      roots.push(node)
+    }
+  })
+
+  // Root kategorileri sort_order/name’e göre sıralamak istersen:
+  roots.sort((a, b) => a.name.localeCompare(b.name))
+
+  return roots
+}
+
 export function Header() {
   const { data: session } = useSession()
   const { settings } = useSettings()
   const router = useRouter()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const [categories, setCategories] = useState<Category[]>([])
+  const [categories, setCategories] = useState<CategoryNode[]>([])
   const [isCategoriesLoading, setIsCategoriesLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [showSearch, setShowSearch] = useState(false)
@@ -128,13 +171,15 @@ export function Header() {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await fetch('/api/categories')
+        const response = await fetch('/api/categories/public')
         const result = await response.json()
+
         if (result.success && Array.isArray(result.data)) {
-          const parentCategories: Category[] = result.data.filter(
-            (category: Category & { parent?: unknown }) => !category.parent,
-          )
-          setCategories(parentCategories)
+          const raw: RawCategory[] = result.data
+          const tree = buildCategoryTree(raw)
+          setCategories(tree)
+        } else {
+          console.warn('Categories API response is not as expected:', result)
         }
       } catch (error) {
         console.error('Error fetching categories:', error)
@@ -153,28 +198,35 @@ export function Header() {
         setIsSearching(true)
         try {
           const response = await fetch(
-            `/api/search?q=${encodeURIComponent(searchQuery.trim())}&limit=8`,
+            `/api/search?q=${encodeURIComponent(
+              searchQuery.trim(),
+            )}&limit=8`,
           )
           const result: SearchApiResponse = await response.json()
 
           if (result.success && result.data) {
-            const articles: ArticleSearchResult[] = (result.data.articles ?? []).map(
-              (item) => ({
-                ...item,
-                kind: 'article' as const,
-              }),
-            )
+            const articles: ArticleSearchResult[] = (
+              result.data.articles ?? []
+            ).map((item) => ({
+              ...item,
+              kind: 'article' as const,
+            }))
 
-            const products: ProductSearchResult[] = (result.data.products ?? []).map(
-              (item) => ({
-                ...item,
-                kind: 'product' as const,
-              }),
-            )
+            const products: ProductSearchResult[] = (
+              result.data.products ?? []
+            ).map((item) => ({
+              ...item,
+              kind: 'product' as const,
+            }))
 
-            const users: UserSearchResult[] = (result.data.users ?? []).map((item) => {
-              const fullName = `${item.first_name ?? ''} ${item.last_name ?? ''}`.trim()
-              const name = item.name || fullName || item.username || ''
+            const users: UserSearchResult[] = (
+              result.data.users ?? []
+            ).map((item) => {
+              const fullName = `${item.first_name ?? ''} ${
+                item.last_name ?? ''
+              }`.trim()
+              const name =
+                item.name || fullName || item.username || ''
               return {
                 kind: 'user' as const,
                 id: item.id,
@@ -257,7 +309,10 @@ export function Header() {
           break
         case 'Enter':
           event.preventDefault()
-          if (selectedIndex >= 0 && selectedIndex < searchResults.length) {
+          if (
+            selectedIndex >= 0 &&
+            selectedIndex < searchResults.length
+          ) {
             const selectedItem = searchResults[selectedIndex]
             const url = getResultUrl(selectedItem)
             router.push(url)
@@ -286,7 +341,9 @@ export function Header() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     if (searchQuery.trim()) {
-      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`)
+      router.push(
+        `/search?q=${encodeURIComponent(searchQuery.trim())}`,
+      )
       setSearchQuery('')
       setShowSearch(false)
       setShowResults(false)
@@ -331,14 +388,19 @@ export function Header() {
           >
             <div className="w-full max-w-2xl mx-4">
               <div className="relative bg-background/95 backdrop-blur-sm rounded-xl border shadow-2xl">
-                <form onSubmit={handleSearch} className="flex items-center p-1">
+                <form
+                  onSubmit={handleSearch}
+                  className="flex items-center p-1"
+                >
                   <div className="relative flex-1">
                     <Input
                       ref={inputRef}
                       type="text"
                       placeholder="Ürün arama..."
                       value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onChange={(e) =>
+                        setSearchQuery(e.target.value)
+                      }
                       className="w-full pr-10 text-lg py-4 border-0 bg-transparent focus:bg-transparent transition-all duration-200"
                       autoFocus
                     />
@@ -346,7 +408,11 @@ export function Header() {
                       <Loader2 className="absolute right-3 top-4 h-4 w-4 animate-spin text-muted-foreground" />
                     )}
                   </div>
-                  <Button type="submit" size="sm" className="ml-2 mr-1">
+                  <Button
+                    type="submit"
+                    size="sm"
+                    className="ml-2 mr-1"
+                  >
                     <Search className="h-4 w-4" />
                   </Button>
                   <Button
@@ -369,7 +435,8 @@ export function Header() {
                   <div className="max-h-96 overflow-y-auto border-t">
                     <div className="space-y-1 p-2">
                       {searchResults.map((item, index) => {
-                        const isSelected = index === selectedIndex
+                        const isSelected =
+                          index === selectedIndex
 
                         const Icon =
                           item.kind === 'article'
@@ -448,7 +515,10 @@ export function Header() {
                                     item.category &&
                                     'name' in item.category && (
                                       <span className="text-xs text-muted-foreground">
-                                        {item.category.name}
+                                        {
+                                          item.category
+                                            .name
+                                        }
                                       </span>
                                     )}
                                 </div>
@@ -500,10 +570,16 @@ export function Header() {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-6">
-            <Link href="/reviews" className="text-sm font-medium hover:text-primary">
+            <Link
+              href="/reviews"
+              className="text-sm font-medium hover:text-primary"
+            >
               İncelemeler
             </Link>
-            <Link href="/products" className="text-sm font-medium hover:text-primary">
+            <Link
+              href="/products"
+              className="text-sm font-medium hover:text-primary"
+            >
               Ürünler
             </Link>
 
@@ -520,41 +596,47 @@ export function Header() {
                       Kategoriler yükleniyor...
                     </div>
                   ) : categories.length > 0 ? (
-                    categories.map((category) => (
-                      <div
-                        key={category.id}
-                        className="group/category relative"
-                      >
-                        <Link
-                          href={`/category/${category.slug}`}
-                          className="block px-4 py-2 text-sm text-foreground hover:bg-muted flex items-center justify-between"
-                        >
-                          <div className="flex items-center gap-2">
-                            <FolderOpen className="w-4 h-4" />
-                            <span>{category.name}</span>
-                          </div>
-                          {category.children.length > 0 && (
-                            <ChevronDown className="w-3 h-3 text-muted-foreground" />
-                          )}
-                        </Link>
+                    categories.map((category) => {
+                      const hasChildren =
+                        category.children &&
+                        category.children.length > 0
 
-                        {category.children.length > 0 && (
-                          <div className="absolute left-full top-0 ml-1 w-56 bg-background border rounded-md shadow-lg opacity-0 invisible group-hover/category:opacity-100 group-hover/category:visible transition-all duration-200 z-50">
-                            <div className="py-2">
-                              {category.children.map((child) => (
-                                <Link
-                                  key={child.id}
-                                  href={`/category/${child.slug}`}
-                                  className="block px-4 py-2 text-sm text-foreground hover:bg-muted flex items-center justify-between"
-                                >
-                                  <span>{child.name}</span>
-                                </Link>
-                              ))}
+                      return (
+                        <div
+                          key={category.id}
+                          className="group/category relative"
+                        >
+                          <Link
+                            href={`/category/${category.slug}`}
+                            className="block px-4 py-2 text-sm text-foreground hover:bg-muted flex items-center justify-between"
+                          >
+                            <div className="flex items-center gap-2">
+                              <FolderOpen className="w-4 h-4" />
+                              <span>{category.name}</span>
                             </div>
-                          </div>
-                        )}
-                      </div>
-                    ))
+                            {hasChildren && (
+                              <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                            )}
+                          </Link>
+
+                          {hasChildren && (
+                            <div className="absolute left-full top-0 ml-1 w-56 bg-background border rounded-md shadow-lg opacity-0 invisible group-hover/category:opacity-100 group-hover/category:visible transition-all duration-200 z-50">
+                              <div className="py-2">
+                                {category.children.map((child) => (
+                                  <Link
+                                    key={child.id}
+                                    href={`/category/${child.slug}`}
+                                    className="block px-4 py-2 text-sm text-foreground hover:bg-muted flex items-center justify-between"
+                                  >
+                                    <span>{child.name}</span>
+                                  </Link>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })
                   ) : (
                     <div className="px-4 py-2 text-sm text-muted-foreground">
                       Henüz kategori bulunmuyor
@@ -564,10 +646,16 @@ export function Header() {
               </div>
             </div>
 
-            <Link href="/best" className="text-sm font-medium hover:text-primary">
+            <Link
+              href="/best"
+              className="text-sm font-medium hover:text-primary"
+            >
               En İyiler
             </Link>
-            <Link href="/compare" className="text-sm font-medium hover:text-primary">
+            <Link
+              href="/compare"
+              className="text-sm font-medium hover:text-primary"
+            >
               Ürün Karşılaştırma
             </Link>
             <Link
@@ -576,10 +664,16 @@ export function Header() {
             >
               Karşılaştırma
             </Link>
-            <Link href="/guides" className="text-sm font-medium hover:text-primary">
+            <Link
+              href="/guides"
+              className="text-sm font-medium hover:text-primary"
+            >
               Rehberler
             </Link>
-            <Link href="/news" className="text-sm font-medium hover:text-primary">
+            <Link
+              href="/news"
+              className="text-sm font-medium hover:text-primary"
+            >
               Haberler
             </Link>
           </nav>
@@ -613,9 +707,13 @@ export function Header() {
                     <div className="py-1">
                       <div className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-600">
                         <div className="font-medium">
-                          {session.user?.name || session.user?.email}
+                          {session.user?.name ||
+                            session.user?.email}
                         </div>
-                        <Badge variant="secondary" className="text-xs">
+                        <Badge
+                          variant="secondary"
+                          className="text-xs"
+                        >
                           {session.user.role || 'USER'}
                         </Badge>
                       </div>
@@ -714,25 +812,30 @@ export function Header() {
                   </div>
                 ) : categories.length > 0 ? (
                   <div className="space-y-2">
-                    {categories.map((category) => (
-                      <div key={category.id} className="ml-2">
-                        <Link
-                          href={`/category/${category.slug}`}
-                          className="block text-sm hover:text-primary flex items-center justify-between"
-                          onClick={() => setIsMenuOpen(false)}
-                        >
-                          <div className="flex items-center gap-2">
-                            <FolderOpen className="w-4 h-4" />
-                            <span>{category.name}</span>
-                          </div>
-                          {category.children.length > 0 && (
-                            <span className="text-xs text-muted-foreground">
-                              ({category.children.length} alt kategori)
-                            </span>
-                          )}
-                        </Link>
-                      </div>
-                    ))}
+                    {categories.map((category) => {
+                      const hasChildren =
+                        category.children &&
+                        category.children.length > 0
+                      return (
+                        <div key={category.id} className="ml-2">
+                          <Link
+                            href={`/category/${category.slug}`}
+                            className="block text-sm hover:text-primary flex items-center justify-between"
+                            onClick={() => setIsMenuOpen(false)}
+                          >
+                            <div className="flex items-center gap-2">
+                              <FolderOpen className="w-4 h-4" />
+                              <span>{category.name}</span>
+                            </div>
+                            {hasChildren && (
+                              <span className="text-xs text-muted-foreground">
+                                ({category.children.length} alt kategori)
+                              </span>
+                            )}
+                          </Link>
+                        </div>
+                      )
+                    })}
                   </div>
                 ) : (
                   <div className="text-sm text-muted-foreground ml-2">
