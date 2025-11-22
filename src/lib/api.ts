@@ -1,8 +1,22 @@
 // hardware/src/lib/api.ts
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+// Server mı client mı ayıralım
+const isServer = typeof window === "undefined";
+
+/**
+ * Server tarafı (Next.js, build, API route’lar) için:
+ *  - DJANGO_API_URL (env) yoksa 127.0.0.1:8001/api kullan
+ */
 export const DJANGO_API_URL =
-  process.env.DJANGO_API_URL || "http://localhost:8000/api";
+  process.env.DJANGO_API_URL || "http://127.0.0.1:8001/api";
+
+/**
+ * Browser tarafı için:
+ *  - NEXT_PUBLIC_API_URL (env) yoksa local fallback
+ */
+const API_BASE_URL = isServer
+  ? DJANGO_API_URL
+  : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001/api";
 
 /* ---------- Ortak response tipleri ---------- */
 
