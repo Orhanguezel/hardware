@@ -89,7 +89,7 @@ export default function ProductComparisonPage() {
     try {
       const [productsRes, categoriesRes] = await Promise.all([
         fetch('/api/products'),
-        fetch('/api/categories/public')
+        fetch('/api/categories')
       ])
 
       const [productsResult, categoriesResult] = await Promise.all([
