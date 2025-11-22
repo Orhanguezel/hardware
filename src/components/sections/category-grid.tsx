@@ -34,7 +34,7 @@ interface Category {
   }
 }
 
-const iconMap: Record<string, any> = {
+const iconMap: Record<string, React.ComponentType<React.SVGProps<SVGSVGElement>>> = {
   'router': Router,
   'modem': Wifi,
   'mesh': Shield,

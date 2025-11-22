@@ -1,3 +1,4 @@
+// src/app/admin/products/new/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -50,10 +51,12 @@ export default function AdminProductsNewPage() {
   const [tags, setTags] = useState<Tag[]>([])
   const [selectedTags, setSelectedTags] = useState<number[]>([])
   const [specs, setSpecs] = useState<ProductSpec[]>([{ name: '', value: '', unit: '' }])
-  const [affiliateLinks, setAffiliateLinks] = useState<AffiliateLink[]>([{ merchant: '', urlTemplate: '', active: true }])
+  const [affiliateLinks, setAffiliateLinks] = useState<AffiliateLink[]>([
+    { merchant: '', urlTemplate: '', active: true },
+  ])
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string>('')
-  
+
   const [formData, setFormData] = useState({
     brand: '',
     model: '',
@@ -61,7 +64,7 @@ export default function AdminProductsNewPage() {
     categoryId: '',
     price: '',
     releaseYear: '',
-    imageUrl: ''
+    imageUrl: '',
   })
 
   useEffect(() => {
@@ -77,7 +80,7 @@ export default function AdminProductsNewPage() {
         // Convert category IDs to strings for consistency
         const categoriesWithStringIds = result.data.map((category: any) => ({
           ...category,
-          id: category.id.toString()
+          id: category.id.toString(),
         }))
         setCategories(categoriesWithStringIds)
       }
@@ -99,42 +102,53 @@ export default function AdminProductsNewPage() {
   }
 
   const addSpec = () => {
-    setSpecs([...specs, { name: '', value: '', unit: '' }])
+    setSpecs((prev) => [...prev, { name: '', value: '', unit: '' }])
   }
 
   const removeSpec = (index: number) => {
-    if (specs.length > 1) {
-      setSpecs(specs.filter((_, i) => i !== index))
-    }
+    setSpecs((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== index) : prev))
   }
 
   const updateSpec = (index: number, field: 'name' | 'value' | 'unit', value: string) => {
-    const newSpecs = [...specs]
-    newSpecs[index][field] = value
-    setSpecs(newSpecs)
+    setSpecs((prev) =>
+      prev.map((spec, i) =>
+        i === index ? { ...spec, [field]: value } : spec,
+      ),
+    )
   }
 
   const addAffiliateLink = () => {
-    setAffiliateLinks([...affiliateLinks, { merchant: '', urlTemplate: '', active: true }])
+    setAffiliateLinks((prev) => [
+      ...prev,
+      { merchant: '', urlTemplate: '', active: true },
+    ])
   }
 
   const removeAffiliateLink = (index: number) => {
-    if (affiliateLinks.length > 1) {
-      setAffiliateLinks(affiliateLinks.filter((_, i) => i !== index))
-    }
+    setAffiliateLinks((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== index) : prev))
   }
 
-  const updateAffiliateLink = (index: number, field: 'merchant' | 'urlTemplate' | 'active', value: string | boolean) => {
-    const newLinks = [...affiliateLinks]
-    newLinks[index][field] = value as any
-    setAffiliateLinks(newLinks)
+  // 🔧 Type-safe update (generic + computed property)
+  const updateAffiliateLink = <K extends keyof AffiliateLink>(
+    index: number,
+    field: K,
+    value: AffiliateLink[K],
+  ) => {
+    setAffiliateLinks((prev) =>
+      prev.map((link, i) =>
+        i === index
+          ? ({
+              ...link,
+              [field]: value,
+            } as AffiliateLink)
+          : link,
+      ),
+    )
   }
 
   const handleTagToggle = (tagId: number) => {
-    setSelectedTags(prev => 
-      prev.includes(tagId) 
-        ? prev.filter(id => id !== tagId)
-        : [...prev, tagId]
+    setSelectedTags((prev) =>
+      prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId],
     )
   }
 
@@ -143,8 +157,8 @@ export default function AdminProductsNewPage() {
     if (file) {
       setImageFile(file)
       const reader = new FileReader()
-      reader.onload = (e) => {
-        setImagePreview(e.target?.result as string)
+      reader.onload = (ev) => {
+        setImagePreview(ev.target?.result as string)
       }
       reader.readAsDataURL(file)
     }
@@ -157,7 +171,7 @@ export default function AdminProductsNewPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!formData.brand || !formData.model || !formData.categoryId) {
       toast.error('Marka, model ve kategori alanları zorunludur')
       return
@@ -175,32 +189,43 @@ export default function AdminProductsNewPage() {
       if (formData.price) formDataToSend.append('price', formData.price)
       if (formData.releaseYear) formDataToSend.append('release_year', formData.releaseYear)
       if (formData.imageUrl) formDataToSend.append('cover_image', formData.imageUrl)
-      
+
       // Add image file if selected
       if (imageFile) {
         formDataToSend.append('cover_image_file', imageFile)
       }
-      
+
       // Add tags
-      selectedTags.forEach(tagId => {
+      selectedTags.forEach((tagId) => {
         formDataToSend.append('tags', tagId.toString())
       })
-      
+
       // Add specs
-      const validSpecs = specs.filter(spec => spec.name && spec.value)
+      const validSpecs = specs.filter((spec) => spec.name && spec.value)
       validSpecs.forEach((spec, index) => {
         formDataToSend.append(`specs[${index}][name]`, spec.name)
         formDataToSend.append(`specs[${index}][value]`, spec.value)
         formDataToSend.append(`specs[${index}][unit]`, spec.unit)
         formDataToSend.append(`specs[${index}][sort_order]`, index.toString())
       })
-      
+
       // Add affiliate links
-      const validLinks = affiliateLinks.filter(link => link.merchant && link.urlTemplate)
+      const validLinks = affiliateLinks.filter(
+        (link) => link.merchant && link.urlTemplate,
+      )
       validLinks.forEach((link, index) => {
-        formDataToSend.append(`affiliate_links_data[${index}][merchant]`, link.merchant)
-        formDataToSend.append(`affiliate_links_data[${index}][url_template]`, link.urlTemplate)
-        formDataToSend.append(`affiliate_links_data[${index}][active]`, link.active.toString())
+        formDataToSend.append(
+          `affiliate_links_data[${index}][merchant]`,
+          link.merchant,
+        )
+        formDataToSend.append(
+          `affiliate_links_data[${index}][url_template]`,
+          link.urlTemplate,
+        )
+        formDataToSend.append(
+          `affiliate_links_data[${index}][active]`,
+          link.active.toString(),
+        )
       })
 
       const response = await fetch('/api/admin/products', {
@@ -260,7 +285,9 @@ export default function AdminProductsNewPage() {
                   <Input
                     id="brand"
                     value={formData.brand}
-                    onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, brand: e.target.value })
+                    }
                     placeholder="Örn: ASUS"
                     required
                   />
@@ -270,7 +297,9 @@ export default function AdminProductsNewPage() {
                   <Input
                     id="model"
                     value={formData.model}
-                    onChange={(e) => setFormData({ ...formData, model: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, model: e.target.value })
+                    }
                     placeholder="Örn: RT-AX88U Pro"
                     required
                   />
@@ -281,7 +310,9 @@ export default function AdminProductsNewPage() {
                 <Label htmlFor="category">Kategori *</Label>
                 <Select
                   value={formData.categoryId}
-                  onValueChange={(value) => setFormData({ ...formData, categoryId: value })}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, categoryId: value })
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Kategori seçin" />
@@ -301,7 +332,9 @@ export default function AdminProductsNewPage() {
                 <Textarea
                   id="description"
                   value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
                   placeholder="Ürün hakkında kısa açıklama..."
                   rows={3}
                 />
@@ -311,7 +344,9 @@ export default function AdminProductsNewPage() {
                 <Label>Etiketler</Label>
                 <div className="mt-2 max-h-32 overflow-y-auto border rounded-md p-2">
                   {tags.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Etiket yükleniyor...</p>
+                    <p className="text-sm text-muted-foreground">
+                      Etiket yükleniyor...
+                    </p>
                   ) : (
                     <div className="flex flex-wrap gap-2">
                       {tags.map((tag) => (
@@ -345,7 +380,9 @@ export default function AdminProductsNewPage() {
                     id="price"
                     type="number"
                     value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, price: e.target.value })
+                    }
                     placeholder="0"
                   />
                 </div>
@@ -355,7 +392,9 @@ export default function AdminProductsNewPage() {
                     id="releaseYear"
                     type="number"
                     value={formData.releaseYear}
-                    onChange={(e) => setFormData({ ...formData, releaseYear: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, releaseYear: e.target.value })
+                    }
                     placeholder="2024"
                   />
                 </div>
@@ -366,7 +405,11 @@ export default function AdminProductsNewPage() {
                 <div className="flex items-center gap-4">
                   <div className="w-24 h-24 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
                     {imagePreview ? (
-                      <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                      <img
+                        src={imagePreview}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                      />
                     ) : (
                       <Package className="w-8 h-8 text-muted-foreground" />
                     )}
@@ -383,7 +426,9 @@ export default function AdminProductsNewPage() {
                       JPG, PNG veya GIF formatında, maksimum 5MB
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {imageFile ? `Seçilen dosya: ${imageFile.name}` : 'Dosya seçilmedi'}
+                      {imageFile
+                        ? `Seçilen dosya: ${imageFile.name}`
+                        : 'Dosya seçilmedi'}
                     </p>
                     {(imageFile || imagePreview) && (
                       <Button
@@ -407,7 +452,12 @@ export default function AdminProductsNewPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Affiliate Bilgileri</CardTitle>
-                <Button type="button" variant="outline" size="sm" onClick={addAffiliateLink}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addAffiliateLink}
+                >
                   <Plus className="w-4 h-4 mr-2" />
                   Link Ekle
                 </Button>
@@ -418,20 +468,32 @@ export default function AdminProductsNewPage() {
                 <div key={index} className="space-y-2">
                   <div className="flex gap-2">
                     <div className="flex-1">
-                      <Label htmlFor={`affiliate-merchant-${index}`}>Satıcı</Label>
+                      <Label htmlFor={`affiliate-merchant-${index}`}>
+                        Satıcı
+                      </Label>
                       <Input
                         id={`affiliate-merchant-${index}`}
                         value={link.merchant}
-                        onChange={(e) => updateAffiliateLink(index, 'merchant', e.target.value)}
+                        onChange={(e) =>
+                          updateAffiliateLink(index, 'merchant', e.target.value)
+                        }
                         placeholder="Örn: Amazon, Teknosa"
                       />
                     </div>
                     <div className="flex-1">
-                      <Label htmlFor={`affiliate-url-${index}`}>Affiliate URL</Label>
+                      <Label htmlFor={`affiliate-url-${index}`}>
+                        Affiliate URL
+                      </Label>
                       <Input
                         id={`affiliate-url-${index}`}
                         value={link.urlTemplate}
-                        onChange={(e) => updateAffiliateLink(index, 'urlTemplate', e.target.value)}
+                        onChange={(e) =>
+                          updateAffiliateLink(
+                            index,
+                            'urlTemplate',
+                            e.target.value,
+                          )
+                        }
                         placeholder="https://affiliate-link.com"
                       />
                     </div>
@@ -475,7 +537,9 @@ export default function AdminProductsNewPage() {
                     <Input
                       id={`spec-name-${index}`}
                       value={spec.name}
-                      onChange={(e) => updateSpec(index, 'name', e.target.value)}
+                      onChange={(e) =>
+                        updateSpec(index, 'name', e.target.value)
+                      }
                       placeholder="Özellik adı (örn: RAM)"
                     />
                   </div>
@@ -484,7 +548,9 @@ export default function AdminProductsNewPage() {
                     <Input
                       id={`spec-value-${index}`}
                       value={spec.value}
-                      onChange={(e) => updateSpec(index, 'value', e.target.value)}
+                      onChange={(e) =>
+                        updateSpec(index, 'value', e.target.value)
+                      }
                       placeholder="Değer (örn: 16)"
                     />
                   </div>
@@ -493,7 +559,9 @@ export default function AdminProductsNewPage() {
                     <Input
                       id={`spec-unit-${index}`}
                       value={spec.unit}
-                      onChange={(e) => updateSpec(index, 'unit', e.target.value)}
+                      onChange={(e) =>
+                        updateSpec(index, 'unit', e.target.value)
+                      }
                       placeholder="Birim (örn: GB)"
                     />
                   </div>

@@ -1,3 +1,5 @@
+// src/app/admin/articles/page.tsx
+
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -6,24 +8,25 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import Link from 'next/link'
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  Edit, 
-  Eye, 
-  Trash2, 
+import {
+  Plus,
+  Search,
+  Filter,
+  Edit,
+  Eye,
+  Trash2,
   Calendar,
   User,
   FileText,
   Loader2,
   CheckCircle,
   XCircle,
-  Clock
+  Clock,
 } from 'lucide-react'
 
 interface Article {
   id: number
+  slug: string            // 🔹 EKLENDİ: URL için slug
   title: string
   subtitle?: string
   type: string
@@ -89,8 +92,9 @@ export default function ArticlesPage() {
       setLoading(true)
       const response = await fetch('/api/admin/articles')
       const data = await response.json()
-      
+
       if (data.success) {
+        // ⚠️ data.data.articles içindeki yapının Article ile uyumlu olduğundan emin ol
         setArticles(data.data.articles)
       } else {
         console.error('Failed to fetch articles:', data.error)
@@ -102,7 +106,8 @@ export default function ArticlesPage() {
     }
   }
 
-  const handleStatusChange = async (articleId: string, newStatus: string) => {
+  // 🔹 id artık number (Article.id ile aynı)
+  const handleStatusChange = async (articleId: number, newStatus: string) => {
     try {
       const response = await fetch(`/api/admin/articles/${articleId}`, {
         method: 'PATCH',
@@ -126,8 +131,12 @@ export default function ArticlesPage() {
     }
   }
 
-  const handleDeleteArticle = async (articleId: string, articleTitle: string) => {
-    if (!confirm(`"${articleTitle}" makalesini silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.`)) {
+  const handleDeleteArticle = async (articleId: number, articleTitle: string) => {
+    if (
+      !confirm(
+        `"${articleTitle}" makalesini silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.`,
+      )
+    ) {
       return
     }
 
@@ -150,14 +159,23 @@ export default function ArticlesPage() {
     }
   }
 
-  const filteredArticles = articles.filter(article => {
-    if (searchTerm && !article.title.toLowerCase().includes(searchTerm.toLowerCase())) {
+  const filteredArticles = articles.filter((article) => {
+    if (
+      searchTerm &&
+      !article.title.toLowerCase().includes(searchTerm.toLowerCase())
+    ) {
       return false
     }
-    if (statusFilter !== 'all' && article.status.toLowerCase() !== statusFilter) {
+    if (
+      statusFilter !== 'all' &&
+      article.status.toLowerCase() !== statusFilter
+    ) {
       return false
     }
-    if (typeFilter !== 'all' && article.type.toLowerCase() !== typeFilter) {
+    if (
+      typeFilter !== 'all' &&
+      article.type.toLowerCase() !== typeFilter
+    ) {
       return false
     }
     return true
@@ -179,11 +197,17 @@ export default function ArticlesPage() {
   const getStatusBadge = (status: string) => {
     switch (status.toLowerCase()) {
       case 'published':
-        return <Badge className="bg-green-100 text-green-800">Yayınlandı</Badge>
+        return (
+          <Badge className="bg-green-100 text-green-800">Yayınlandı</Badge>
+        )
       case 'draft':
-        return <Badge className="bg-yellow-100 text-yellow-800">Taslak</Badge>
+        return (
+          <Badge className="bg-yellow-100 text-yellow-800">Taslak</Badge>
+        )
       case 'archived':
-        return <Badge className="bg-gray-100 text-gray-800">Arşivlendi</Badge>
+        return (
+          <Badge className="bg-gray-100 text-gray-800">Arşivlendi</Badge>
+        )
       default:
         return <Badge variant="secondary">{status}</Badge>
     }
@@ -241,7 +265,7 @@ export default function ArticlesPage() {
                 />
               </div>
             </div>
-            
+
             <div>
               <label className="text-sm font-medium">Durum</label>
               <select
@@ -264,8 +288,9 @@ export default function ArticlesPage() {
                 className="w-full p-2 border rounded-md mt-1 bg-white text-gray-900"
               >
                 <option value="all">Tüm Tipler</option>
+                {/* article.type büyük harf geldiği için bunları lowercase eşleştiriyorsun */}
                 <option value="review">İnceleme</option>
-                <option value="best list">En İyi Listesi</option>
+                <option value="best_list">En İyi Listesi</option>
                 <option value="compare">Karşılaştırma</option>
                 <option value="guide">Rehber</option>
                 <option value="news">Haber</option>
@@ -287,52 +312,62 @@ export default function ArticlesPage() {
                     {getStatusIcon(article.status)}
                     {getStatusBadge(article.status)}
                   </div>
-                  
+
                   {article.subtitle && (
-                    <p className="text-muted-foreground mb-3">{article.subtitle}</p>
+                    <p className="text-muted-foreground mb-3">
+                      {article.subtitle}
+                    </p>
                   )}
 
                   {/* Tags */}
-                  {article.article_tags && article.article_tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mb-3">
-                      {article.article_tags.slice(0, 5).map((tag) => (
-                        <Badge key={tag.id} variant="secondary" className="text-xs">
-                          {tag.name}
-                        </Badge>
-                      ))}
-                      {article.article_tags.length > 5 && (
-                        <Badge variant="outline" className="text-xs">
-                          +{article.article_tags.length - 5}
-                        </Badge>
-                      )}
-                    </div>
-                  )}
+                  {article.article_tags &&
+                    article.article_tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {article.article_tags.slice(0, 5).map((tag) => (
+                          <Badge
+                            key={tag.id}
+                            variant="secondary"
+                            className="text-xs"
+                          >
+                            {tag.name}
+                          </Badge>
+                        ))}
+                        {article.article_tags.length > 5 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{article.article_tags.length - 5}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
 
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <div className="flex items-center gap-1">
                       <User className="w-4 h-4" />
                       <span>{article.author?.name || 'Bilinmiyor'}</span>
                     </div>
-                    
+
                     {article.category && (
                       <div className="flex items-center gap-1">
                         <FileText className="w-4 h-4" />
                         <span>{article.category.name}</span>
                       </div>
                     )}
-                    
+
                     <div className="flex items-center gap-1">
                       <Calendar className="w-4 h-4" />
                       <span>
-                        {article.published_at 
-                          ? new Date(article.published_at).toLocaleDateString('tr-TR')
-                          : new Date(article.created_at).toLocaleDateString('tr-TR')
-                        }
+                        {article.published_at
+                          ? new Date(
+                              article.published_at,
+                            ).toLocaleDateString('tr-TR')
+                          : new Date(
+                              article.created_at,
+                            ).toLocaleDateString('tr-TR')}
                       </span>
                     </div>
 
                     <span>{article.comment_count || 0} yorum</span>
-                    
+
                     {article.review_extra && (
                       <span className="font-medium text-yellow-600">
                         ⭐ {article.review_extra.total_score}/10
@@ -348,7 +383,7 @@ export default function ArticlesPage() {
                       Görüntüle
                     </Link>
                   </Button>
-                  
+
                   <Button variant="outline" size="sm" asChild>
                     <Link href={`/admin/articles/edit/${article.id}`}>
                       <Edit className="w-4 h-4 mr-1" />
@@ -360,7 +395,9 @@ export default function ArticlesPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleStatusChange(article.id, 'PUBLISHED')}
+                      onClick={() =>
+                        handleStatusChange(article.id, 'PUBLISHED')
+                      }
                     >
                       <Eye className="w-4 h-4 mr-1" />
                       Yayınla
@@ -371,7 +408,9 @@ export default function ArticlesPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleStatusChange(article.id, 'ARCHIVED')}
+                      onClick={() =>
+                        handleStatusChange(article.id, 'ARCHIVED')
+                      }
                     >
                       <XCircle className="w-4 h-4 mr-1" />
                       Arşivle
@@ -381,7 +420,9 @@ export default function ArticlesPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleDeleteArticle(article.id, article.title)}
+                    onClick={() =>
+                      handleDeleteArticle(article.id, article.title)
+                    }
                     className="text-red-600 hover:text-red-700"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -400,10 +441,11 @@ export default function ArticlesPage() {
               <FileText className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
               <h3 className="text-lg font-semibold mb-2">Makale Bulunamadı</h3>
               <p className="text-muted-foreground mb-4">
-                {searchTerm || statusFilter !== 'all' || typeFilter !== 'all'
+                {searchTerm ||
+                statusFilter !== 'all' ||
+                typeFilter !== 'all'
                   ? 'Arama kriterlerinize uygun makale bulunamadı.'
-                  : 'Henüz hiç makale eklenmemiş.'
-                }
+                  : 'Henüz hiç makale eklenmemiş.'}
               </p>
               <Button asChild>
                 <Link href="/admin/articles/new">

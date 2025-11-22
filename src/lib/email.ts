@@ -1,3 +1,5 @@
+// hardware/src/lib/email.ts
+
 // Email service configuration
 export const emailConfig = {
   from: 'Hardware Review <noreply@hardware-review.com>',

@@ -18,7 +18,6 @@ import { FavoriteButton } from '@/components/product/favorite-button'
 
 interface Favorite {
   id: number
-  product: number
   created_at: string
   product: {
     id: number

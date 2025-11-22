@@ -1,8 +1,29 @@
-import { NextAuthOptions } from 'next-auth'
-import GoogleProvider from 'next-auth/providers/google'
-import DiscordProvider from 'next-auth/providers/discord'
-import CredentialsProvider from 'next-auth/providers/credentials'
-import { DJANGO_API_URL } from './api'
+// hardware/src/lib/auth.ts
+
+import { type NextAuthOptions, type Session, type User } from "next-auth";
+import type { JWT } from "next-auth/jwt";
+import GoogleProvider from "next-auth/providers/google";
+import DiscordProvider from "next-auth/providers/discord";
+import CredentialsProvider from "next-auth/providers/credentials";
+import { DJANGO_API_URL } from "./api";
+
+/* ---------- Django login response tipleri ---------- */
+
+interface DjangoUser {
+  id: number | string;
+  email: string;
+  first_name?: string | null;
+  username?: string | null;
+  role?: string | null;
+  [key: string]: unknown;
+}
+
+interface DjangoLoginResponse {
+  token: string;
+  user: DjangoUser;
+}
+
+/* ---------- Auth options ---------- */
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -15,87 +36,130 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.DISCORD_CLIENT_SECRET!,
     }),
     CredentialsProvider({
-      name: 'credentials',
+      name: "credentials",
       credentials: {
-        email: { label: 'Email', type: 'email' },
-        password: { label: 'Password', type: 'password' }
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          return null
+          return null;
         }
 
         try {
-          const response = await fetch(`${DJANGO_API_URL}/auth/login/`, {
-            method: 'POST',
+          const url = `${DJANGO_API_URL}/auth/login/`;
+          console.log("🔐 [NextAuth] Login isteği:", url, credentials.email);
+
+          const response = await fetch(url, {
+            method: "POST",
             headers: {
-              'Content-Type': 'application/json',
+              "Content-Type": "application/json",
             },
             body: JSON.stringify({
+              // Gerekirse burada username'e çevir:
+              // username: credentials.email,
               email: credentials.email,
-              password: credentials.password
+              password: credentials.password,
             }),
-          })
+          });
 
           if (!response.ok) {
-            return null
+            const text = await response.text().catch(() => "");
+            console.error(
+              "❌ [NextAuth] Login failed:",
+              response.status,
+              text || "<empty body>",
+            );
+            return null;
           }
 
-          const data = await response.json()
-          
-          return {
+          const data = (await response.json()) as DjangoLoginResponse;
+          console.log("✅ [NextAuth] Login success, Django response:", data);
+
+          const user: User & { role: string; accessToken: string } = {
             id: data.user.id.toString(),
             email: data.user.email,
-            name: data.user.first_name || data.user.username,
-            role: data.user.role,
+            name:
+              data.user.first_name ||
+              data.user.username ||
+              data.user.email,
+            // NextAuth augment’inde role zorunlu olduğu için burada default veriyoruz
+            role: data.user.role ?? "user",
             accessToken: data.token,
-          }
+          };
+
+          return user;
         } catch (error) {
-          console.error('Auth error:', error)
-          return null
+          console.error("🔥 [NextAuth] Auth error:", error);
+          return null;
         }
-      }
-    })
+      },
+    }),
   ],
   session: {
-    strategy: 'jwt',
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 gün
   },
   jwt: {
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: 30 * 24 * 60 * 60, // 30 gün
   },
   callbacks: {
-    async jwt({ token, user, account }) {
+    async jwt({ token, user }) {
+      // İlk login anında user dolu olur
       if (user) {
-        token.role = (user as any).role
-        token.accessToken = (user as any).accessToken
+        const u = user as User & { role?: string; accessToken?: string };
+
+        (token as JWT & { role: string }).role = u.role ?? "user";
+        (token as JWT & { accessToken: string }).accessToken =
+          u.accessToken ?? "";
+      } else {
+        // Sonraki isteklerde user yok, token'dan devam
+        const t = token as JWT & { role?: string; accessToken?: string };
+
+        (token as JWT & { role: string }).role = t.role ?? "user";
+        (token as JWT & { accessToken: string }).accessToken =
+          t.accessToken ?? "";
       }
-      return token
+
+      return token;
     },
+
     async session({ session, token }) {
-      if (token && session.user) {
-        (session.user as any).id = token.sub!
-        ;(session.user as any).role = token.role as string
-        ;(session as any).accessToken = token.accessToken
+      const s = session as Session & {
+        user: Session["user"] & { id?: string; role?: string };
+        accessToken?: string;
+      };
+
+      if (token.sub) {
+        s.user.id = token.sub;
       }
-      return session
+
+      const t = token as JWT & { role?: string; accessToken?: string };
+
+      s.user.role = t.role ?? "user";
+      s.accessToken = t.accessToken ?? "";
+
+      return s;
     },
+
     async redirect({ url, baseUrl }) {
-      // Sign in ve sign out sonrası ana sayfaya yönlendir
-      if (url === baseUrl + '/api/auth/signin' || url === baseUrl + '/api/auth/signout') {
-        return baseUrl
+      if (
+        url === `${baseUrl}/api/auth/signin` ||
+        url === `${baseUrl}/api/auth/signout`
+      ) {
+        return baseUrl;
       }
-      // Eğer URL baseUrl ile başlıyorsa, o URL'i kullan
+
       if (url.startsWith(baseUrl)) {
-        return url
+        return url;
       }
-      // Diğer durumlarda baseUrl'e yönlendir
-      return baseUrl
+
+      return baseUrl;
     },
   },
   pages: {
-    signIn: '/auth/signin',
+    signIn: "/auth/signin",
   },
   secret: process.env.NEXTAUTH_SECRET,
-  debug: process.env.NODE_ENV === 'development',
-}
+  debug: process.env.NODE_ENV === "development",
+};

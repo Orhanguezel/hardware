@@ -1,8 +1,10 @@
+// src/app/api/admin/products/[id]/route.ts
+
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
-const djangoApiUrl = 'http://localhost:8000/api'
+const DJANGO_API_URL = process.env.DJANGO_API_URL || 'http://localhost:8000/api'
 
 interface RouteParams {
   params: Promise<{
@@ -10,12 +12,23 @@ interface RouteParams {
   }>
 }
 
+interface DjangoAffiliateLink {
+  id: number
+  merchant: string
+  url_template: string
+  active: boolean
+}
+
 // Get single product
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.id || !['ADMIN', 'SUPER_ADMIN'].includes(session.user.role)) {
+
+    const user = session?.user as any
+    const role = user?.role as string | undefined
+    const accessToken = (session as any)?.accessToken as string | undefined
+
+    if (!user?.id || !role || !['ADMIN', 'SUPER_ADMIN'].includes(role)) {
       return NextResponse.json(
         { success: false, error: 'Admin or Super Admin access required' },
         { status: 403 }
@@ -24,11 +37,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params
 
-    const response = await fetch(`${djangoApiUrl}/products/id/${id}/`, {
+    const response = await fetch(`${DJANGO_API_URL}/products/id/${id}/`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Token ${(session as any).accessToken || ''}`,
+        Authorization: `Token ${accessToken || ''}`,
       },
     })
 
@@ -54,33 +67,36 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       price: product.price,
       releaseYear: product.release_year,
       coverImage: product.cover_image,
-      category: product.category ? {
-        id: product.category.id.toString(),
-        name: product.category.name,
-        slug: product.category.slug
-      } : null,
+      category: product.category
+        ? {
+            id: product.category.id.toString(),
+            name: product.category.name,
+            slug: product.category.slug,
+          }
+        : null,
       productSpecs: product.specs || [],
       product_tags: product.product_tags || [],
-      affiliateLinks: (product.affiliate_links || []).map(link => ({
-        id: link.id,
-        merchant: link.merchant,
-        urlTemplate: link.url_template,
-        active: link.active
-      })),
+      affiliateLinks: (product.affiliate_links || []).map(
+        (link: DjangoAffiliateLink) => ({
+          id: link.id,
+          merchant: link.merchant,
+          urlTemplate: link.url_template,
+          active: link.active,
+        })
+      ),
       userReviews: product.user_reviews || [],
       averageRating: product.average_rating,
       reviewCount: product.review_count || 0,
       specsCount: product.specs?.length || 0,
       affiliateLinksCount: product.affiliate_links?.length || 0,
       createdAt: product.created_at,
-      updatedAt: product.updated_at
+      updatedAt: product.updated_at,
     }
 
     return NextResponse.json({
       success: true,
-      data: transformedProduct
+      data: transformedProduct,
     })
-
   } catch (error) {
     console.error('Error fetching product:', error)
     return NextResponse.json(
@@ -94,8 +110,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.id || !['ADMIN', 'SUPER_ADMIN'].includes(session.user.role)) {
+
+    const user = session?.user as any
+    const role = user?.role as string | undefined
+    const accessToken = (session as any)?.accessToken as string | undefined
+
+    if (!user?.id || !role || !['ADMIN', 'SUPER_ADMIN'].includes(role)) {
       return NextResponse.json(
         { success: false, error: 'Admin or Super Admin access required' },
         { status: 403 }
@@ -104,8 +124,11 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params
     const formData = await request.formData()
-    
-    console.log('API Route - Received FormData:', Object.fromEntries(formData.entries()))
+
+    console.log(
+      'API Route - Received FormData:',
+      Object.fromEntries(formData.entries())
+    )
 
     const brand = formData.get('brand') as string
     const model = formData.get('model') as string
@@ -118,10 +141,10 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       )
     }
 
-    const response = await fetch(`${djangoApiUrl}/products/id/${id}/`, {
+    const response = await fetch(`${DJANGO_API_URL}/products/id/${id}/`, {
       method: 'PUT',
       headers: {
-        'Authorization': `Token ${(session as any).accessToken || ''}`,
+        Authorization: `Token ${accessToken || ''}`,
       },
       body: formData,
     })
@@ -152,33 +175,36 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       price: updatedProduct.price,
       releaseYear: updatedProduct.release_year,
       coverImage: updatedProduct.cover_image,
-      category: updatedProduct.category ? {
-        id: updatedProduct.category.id.toString(),
-        name: updatedProduct.category.name,
-        slug: updatedProduct.category.slug
-      } : null,
+      category: updatedProduct.category
+        ? {
+            id: updatedProduct.category.id.toString(),
+            name: updatedProduct.category.name,
+            slug: updatedProduct.category.slug,
+          }
+        : null,
       productSpecs: updatedProduct.specs || [],
       product_tags: updatedProduct.product_tags || [],
-      affiliateLinks: (updatedProduct.affiliate_links || []).map(link => ({
-        id: link.id,
-        merchant: link.merchant,
-        urlTemplate: link.url_template,
-        active: link.active
-      })),
+      affiliateLinks: (updatedProduct.affiliate_links || []).map(
+        (link: DjangoAffiliateLink) => ({
+          id: link.id,
+          merchant: link.merchant,
+          urlTemplate: link.url_template,
+          active: link.active,
+        })
+      ),
       averageRating: updatedProduct.average_rating,
       reviewCount: updatedProduct.review_count || 0,
       specsCount: updatedProduct.specs?.length || 0,
       affiliateLinksCount: updatedProduct.affiliate_links?.length || 0,
       createdAt: updatedProduct.created_at,
-      updatedAt: updatedProduct.updated_at
+      updatedAt: updatedProduct.updated_at,
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      data: transformedProduct 
+    return NextResponse.json({
+      success: true,
+      data: transformedProduct,
     })
-
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating product:', error)
     return NextResponse.json(
       { success: false, error: 'Failed to update product' },
@@ -191,8 +217,12 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.id || !['ADMIN', 'SUPER_ADMIN'].includes(session.user.role)) {
+
+    const user = session?.user as any
+    const role = user?.role as string | undefined
+    const accessToken = (session as any)?.accessToken as string | undefined
+
+    if (!user?.id || !role || !['ADMIN', 'SUPER_ADMIN'].includes(role)) {
       return NextResponse.json(
         { success: false, error: 'Admin or Super Admin access required' },
         { status: 403 }
@@ -201,11 +231,11 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params
 
-    const response = await fetch(`${djangoApiUrl}/products/id/${id}/`, {
+    const response = await fetch(`${DJANGO_API_URL}/products/id/${id}/`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Token ${(session as any).accessToken || ''}`,
+        Authorization: `Token ${accessToken || ''}`,
       },
     })
 
@@ -223,11 +253,10 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       )
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Product deleted successfully' 
+    return NextResponse.json({
+      success: true,
+      message: 'Product deleted successfully',
     })
-
   } catch (error) {
     console.error('Error deleting product:', error)
     return NextResponse.json(

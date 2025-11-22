@@ -1,3 +1,5 @@
+// Örnek: src/app/best/[slug]/page.tsx  (senin proje yapına göre yolu uyarlayabilirsin)
+
 import { notFound } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -27,6 +29,10 @@ interface BestList {
     slug: string
     type: string
   }>
+  // ↓ API'den gelen ek alanlar
+  type: string
+  meta_title?: string | null
+  meta_description?: string | null
   best_list_extra?: {
     items: Array<{
       id: string
@@ -45,47 +51,58 @@ interface BestList {
 async function getBestList(slug: string): Promise<BestList | null> {
   try {
     const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/articles/${slug}/`, {
-      cache: 'no-store'
+      cache: 'no-store',
     })
-    
+
     if (!response.ok) {
       if (response.status === 404) {
         return null
       }
       throw new Error('Failed to fetch best list')
     }
-    
+
     const data = await response.json()
-    return data
+    return data as BestList
   } catch (error) {
     console.error('Error fetching best list:', error)
     return null
   }
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
   const { slug } = await params
   const bestList = await getBestList(slug)
-  
+
   if (!bestList || bestList.type !== 'BEST_LIST') {
     return {
       title: 'En İyi Liste Bulunamadı',
-      description: 'Aradığınız en iyi liste bulunamadı.'
+      description: 'Aradığınız en iyi liste bulunamadı.',
     }
   }
 
+  const title = bestList.meta_title || bestList.title
+  const description = bestList.meta_description || bestList.excerpt
+
   return {
-    title: bestList.meta_title || bestList.title,
-    description: bestList.meta_description || bestList.excerpt,
+    title,
+    description,
     openGraph: {
-      title: bestList.meta_title || bestList.title,
-      description: bestList.meta_description || bestList.excerpt,
+      title,
+      description,
       images: bestList.hero_image ? [bestList.hero_image] : [],
     },
   }
 }
 
-export default async function BestListPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function BestListPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
   const { slug } = await params
   const bestList = await getBestList(slug)
 
@@ -93,7 +110,7 @@ export default async function BestListPage({ params }: { params: Promise<{ slug:
     notFound()
   }
 
-  // Debug logging (remove in production)
+  // Debug logging (development)
   if (process.env.NODE_ENV === 'development') {
     console.log('Best List Data:', bestList)
     if (bestList.best_list_extra?.items) {
@@ -102,7 +119,7 @@ export default async function BestListPage({ params }: { params: Promise<{ slug:
         console.log(`Item ${index + 1}:`, {
           title: item.title,
           image: item.image,
-          hasImage: !!item.image
+          hasImage: !!item.image,
         })
       })
     }
@@ -110,49 +127,56 @@ export default async function BestListPage({ params }: { params: Promise<{ slug:
 
   return (
     <div className="container py-8">
+      {/* articleId artık number */}
       <ArticleViewTrackerWrapper articleId={bestList.id} />
+
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center gap-2 mb-4">
           <Badge variant="secondary">{bestList.category.name}</Badge>
-          {bestList.best_list_extra?.items && bestList.best_list_extra.items.length > 0 && (
-            <Badge variant="outline" className="text-blue-600 border-blue-600">
-              <Award className="w-3 h-3 mr-1" />
-              {bestList.best_list_extra.items.length} Ürün
-            </Badge>
-          )}
+          {bestList.best_list_extra?.items &&
+            bestList.best_list_extra.items.length > 0 && (
+              <Badge variant="outline" className="text-blue-600 border-blue-600">
+                <Award className="w-3 h-3 mr-1" />
+                {bestList.best_list_extra.items.length} Ürün
+              </Badge>
+            )}
         </div>
-        
+
         <h1 className="text-4xl font-bold mb-4">{bestList.title}</h1>
         {bestList.subtitle && (
           <p className="text-xl text-muted-foreground mb-4">{bestList.subtitle}</p>
         )}
-        
+
         {/* Tags */}
         {bestList.article_tags && bestList.article_tags.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-4">
-            {bestList.article_tags.map((tag: any) => (
+            {bestList.article_tags.map((tag) => (
               <Badge key={tag.id} variant="outline" className="text-sm">
                 {tag.name}
               </Badge>
             ))}
           </div>
         )}
-        
+
         <p className="text-lg text-muted-foreground mb-6">{bestList.excerpt}</p>
-        
+
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
-          <span>{bestList.author.first_name} {bestList.author.last_name}</span>
+          <span>
+            {bestList.author.first_name} {bestList.author.last_name}
+          </span>
           <span>•</span>
-          <span>{new Date(bestList.published_at).toLocaleDateString('tr-TR')}</span>
+          <span>
+            {new Date(bestList.published_at).toLocaleDateString('tr-TR')}
+          </span>
         </div>
       </div>
 
       {/* Hero Image */}
       {bestList.hero_image && (
         <div className="mb-8">
-          <img 
-            src={bestList.hero_image} 
+          <img
+            src={bestList.hero_image}
             alt={bestList.title}
             className="w-full h-64 object-cover rounded-lg"
           />
@@ -163,7 +187,7 @@ export default async function BestListPage({ params }: { params: Promise<{ slug:
       {bestList.best_list_extra?.items && bestList.best_list_extra.items.length > 0 ? (
         <div className="space-y-6">
           <h2 className="text-2xl font-bold">En İyi Seçenekler</h2>
-          
+
           {bestList.best_list_extra.items.map((item, index) => (
             <Card key={item.id} className="overflow-hidden">
               <CardHeader>
@@ -180,12 +204,14 @@ export default async function BestListPage({ params }: { params: Promise<{ slug:
                     </div>
                     <CardTitle className="text-xl">{item.title}</CardTitle>
                     {item.price && (
-                      <p className="text-lg font-semibold text-primary mt-1">{item.price}</p>
+                      <p className="text-lg font-semibold text-primary mt-1">
+                        {item.price}
+                      </p>
                     )}
                   </div>
                   {item.image ? (
-                    <img 
-                      src={item.image} 
+                    <img
+                      src={item.image}
                       alt={item.title}
                       className="w-20 h-20 object-cover rounded-lg"
                     />
@@ -196,12 +222,12 @@ export default async function BestListPage({ params }: { params: Promise<{ slug:
                   )}
                 </div>
               </CardHeader>
-              
+
               <CardContent>
                 {item.description && (
                   <p className="text-muted-foreground mb-4">{item.description}</p>
                 )}
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                   {/* Pros */}
                   {item.pros && item.pros.length > 0 && (
@@ -212,7 +238,10 @@ export default async function BestListPage({ params }: { params: Promise<{ slug:
                       </h4>
                       <ul className="space-y-1">
                         {item.pros.map((pro, proIndex) => (
-                          <li key={proIndex} className="text-sm text-green-700 flex items-start gap-2">
+                          <li
+                            key={proIndex}
+                            className="text-sm text-green-700 flex items-start gap-2"
+                          >
                             <Check className="w-3 h-3 mt-0.5 flex-shrink-0" />
                             {pro}
                           </li>
@@ -220,7 +249,7 @@ export default async function BestListPage({ params }: { params: Promise<{ slug:
                       </ul>
                     </div>
                   )}
-                  
+
                   {/* Cons */}
                   {item.cons && item.cons.length > 0 && (
                     <div>
@@ -230,7 +259,10 @@ export default async function BestListPage({ params }: { params: Promise<{ slug:
                       </h4>
                       <ul className="space-y-1">
                         {item.cons.map((con, conIndex) => (
-                          <li key={conIndex} className="text-sm text-red-700 flex items-start gap-2">
+                          <li
+                            key={conIndex}
+                            className="text-sm text-red-700 flex items-start gap-2"
+                          >
                             <X className="w-3 h-3 mt-0.5 flex-shrink-0" />
                             {con}
                           </li>
@@ -239,7 +271,7 @@ export default async function BestListPage({ params }: { params: Promise<{ slug:
                     </div>
                   )}
                 </div>
-                
+
                 {item.link && (
                   <Button asChild className="w-full">
                     <a href={item.link} target="_blank" rel="noopener noreferrer">
@@ -264,7 +296,8 @@ export default async function BestListPage({ params }: { params: Promise<{ slug:
 
       {/* Comments */}
       <div className="mt-12">
-        <CommentSystem articleId={bestList.id.toString()} />
+        {/* articleId burada da number */}
+        <CommentSystem articleId={bestList.id} />
       </div>
     </div>
   )

@@ -10,8 +10,7 @@ import {
   Search, 
   Filter, 
   X, 
-  Star, 
-  Calendar,
+  Star,
   Tag,
   Wifi,
   DollarSign,
@@ -90,7 +89,7 @@ export default function AdvancedSearch({ onSearch, initialFilters }: AdvancedSea
     onSearch?.(filters)
   }, [filters, onSearch])
 
-  const updateFilter = (key: keyof SearchFilters, value: any) => {
+  const updateFilter = (key: keyof SearchFilters, value: SearchFilters[keyof SearchFilters]) => {
     setFilters(prev => ({
       ...prev,
       [key]: value
@@ -205,7 +204,7 @@ export default function AdvancedSearch({ onSearch, initialFilters }: AdvancedSea
               <div className="space-y-4">
                 <Slider
                   value={filters.priceRange}
-                  onValueChange={(value) => updateFilter('priceRange', value)}
+                  onValueChange={(value) => updateFilter('priceRange', [value[0], value[1]])}
                   max={10000}
                   min={0}
                   step={100}

@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Token ${session.accessToken || ''}`,
+        'Authorization': `Token ${(session as any).accessToken}`
       },
       body: JSON.stringify({
         currentPassword: currentPassword,

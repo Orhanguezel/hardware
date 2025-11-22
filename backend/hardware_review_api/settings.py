@@ -81,13 +81,13 @@ WSGI_APPLICATION = 'hardware_review_api.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DB_NAME', default='hardware_db'),
-        'USER': config('DB_USER', default='hardware_user'),
-        'PASSWORD': config('DB_PASSWORD', default='PgAdmin2025!'),
-        'HOST': config('DB_HOST', default='localhost'),
-        'PORT': config('DB_PORT', default='5432'),
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": "hardware_db",
+        "USER": "hardware_user",
+        "PASSWORD": "PgAdmin2025!",
+        "HOST": "localhost",
+        "PORT": "5432",
     }
 }
 

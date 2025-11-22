@@ -60,15 +60,14 @@ export function ShareButton({ url, title, description, className = '' }: ShareBu
     try {
       await navigator.clipboard.writeText(text)
       toast.success('Link kopyalandı!')
-    } catch (error) {
-      // Fallback for older browsers
+    } catch (error: unknown) {
       const textArea = document.createElement('textarea')
       textArea.value = text
       document.body.appendChild(textArea)
       textArea.select()
       document.execCommand('copy')
       document.body.removeChild(textArea)
-      toast.success('Link kopyalandı!')
+      toast.success(error instanceof Error ? error.message : 'Link kopyalandı!')
     }
   }
 

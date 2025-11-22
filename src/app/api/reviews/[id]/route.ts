@@ -88,7 +88,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Token ${session.accessToken}`,
+        'Authorization': `Token ${(session as any).accessToken}`
       },
       body: JSON.stringify({
         rating: parseInt(rating),
@@ -161,7 +161,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     const response = await fetch(`${DJANGO_API_URL}/reviews/${id}/`, {
       method: 'DELETE',
       headers: {
-        'Authorization': `Token ${session.accessToken}`,
+        'Authorization': `Token ${(session as any).accessToken}`,
       },
     })
 

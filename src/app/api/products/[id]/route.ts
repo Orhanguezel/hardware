@@ -1,3 +1,5 @@
+// hardware/src/app/api/products/%5Bid%5D/route.ts
+
 import { NextRequest, NextResponse } from 'next/server'
 
 const DJANGO_API_URL = process.env.DJANGO_API_URL || 'http://localhost:8000/api'
@@ -7,6 +9,7 @@ interface RouteParams {
     id: string
   }>
 }
+
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {

@@ -68,7 +68,7 @@ export function BrandFilters({ brands, selectedBrand }: BrandFiltersProps) {
 
         {filteredBrands.length === 0 && searchTerm && (
           <div className="text-sm text-muted-foreground p-2 text-center">
-            "{searchTerm}" için marka bulunamadı
+            Aradığınız marka bulunamadı.
           </div>
         )}
       </div>

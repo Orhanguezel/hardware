@@ -8,9 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { 
   MessageCircle, 
   Reply, 
-  ThumbsUp, 
   Calendar,
-  User,
   ChevronDown,
   ChevronUp
 } from 'lucide-react'

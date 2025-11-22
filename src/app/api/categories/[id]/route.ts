@@ -1,3 +1,5 @@
+// src/app/api/categories/[id]/route.ts
+
 import { NextRequest, NextResponse } from 'next/server'
 
 const DJANGO_API_URL = process.env.DJANGO_API_URL || 'http://localhost:8000/api'
@@ -33,7 +35,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const data = await response.json()
     return NextResponse.json({
       success: true,
-      data: data
+      data: data,
     })
   } catch (error) {
     console.error('Error fetching category:', error)
@@ -47,7 +49,16 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
     const body = await request.json()
-    const { name, slug, parent, description, icon, color, sort_order, is_active } = body
+    const {
+      name,
+      slug,
+      parent,
+      description,
+      icon,
+      color,
+      sort_order,
+      is_active,
+    } = body
 
     if (!name || !slug) {
       return NextResponse.json(
@@ -60,8 +71,10 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const { getServerSession } = await import('next-auth')
     const { authOptions } = await import('@/lib/auth')
     const session = await getServerSession(authOptions)
-    
-    if (!session?.accessToken) {
+
+    const accessToken = (session as any)?.accessToken as string | undefined
+
+    if (!accessToken) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 401 }
@@ -75,7 +88,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Token ${session.accessToken}`,
+        Authorization: `Token ${accessToken}`,
       },
       body: JSON.stringify({
         name,
@@ -85,20 +98,23 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         icon,
         color,
         sort_order: sort_order || 0,
-        is_active: is_active !== undefined ? is_active : true
+        is_active: is_active !== undefined ? is_active : true,
       }),
     })
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
-      if (response.status === 400 && errorData.slug) {
+      if (response.status === 400 && (errorData as any).slug) {
         return NextResponse.json(
           { success: false, error: 'Category with this slug already exists' },
           { status: 409 }
         )
       }
       return NextResponse.json(
-        { success: false, error: errorData.error || 'Failed to update category' },
+        {
+          success: false,
+          error: (errorData as any).error || 'Failed to update category',
+        },
         { status: response.status }
       )
     }
@@ -106,7 +122,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const data = await response.json()
     return NextResponse.json({
       success: true,
-      data: data
+      data: data,
     })
   } catch (error) {
     console.error('Error updating category:', error)
@@ -123,8 +139,10 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     const { getServerSession } = await import('next-auth')
     const { authOptions } = await import('@/lib/auth')
     const session = await getServerSession(authOptions)
-    
-    if (!session?.accessToken) {
+
+    const accessToken = (session as any)?.accessToken as string | undefined
+
+    if (!accessToken) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 401 }
@@ -138,21 +156,24 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Token ${session.accessToken}`,
+        Authorization: `Token ${accessToken}`,
       },
     })
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
       return NextResponse.json(
-        { success: false, error: errorData.error || 'Failed to delete category' },
+        {
+          success: false,
+          error: (errorData as any).error || 'Failed to delete category',
+        },
         { status: response.status }
       )
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Category deleted successfully'
+      message: 'Category deleted successfully',
     })
   } catch (error) {
     console.error('Error deleting category:', error)

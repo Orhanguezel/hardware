@@ -75,7 +75,7 @@ export async function GET() {
   </url>
 
   <!-- Article pages -->
-  ${articles.map(article => {
+  ${articles.map((article: any) => {
     const lastmod = article.updatedAt || article.publishedAt || currentDate
     const priority = article.type === 'REVIEW' ? '0.9' : '0.8'
     const changefreq = article.type === 'NEWS' ? 'monthly' : 'weekly'
@@ -110,7 +110,7 @@ export async function GET() {
   }).join('\n')}
 
   <!-- Category pages -->
-  ${categories.map(category => `  <url>
+  ${categories.map((category: any) => `  <url>
     <loc>${baseUrl}/category/${category.slug}</loc>
     <lastmod>${currentDate}</lastmod>
     <changefreq>weekly</changefreq>
@@ -118,7 +118,7 @@ export async function GET() {
   </url>`).join('\n')}
 
   <!-- Product pages -->
-  ${products.map(product => `  <url>
+  ${products.map((product: any) => `  <url>
     <loc>${baseUrl}/products/${product.slug}</loc>
     <lastmod>${currentDate}</lastmod>
     <changefreq>monthly</changefreq>

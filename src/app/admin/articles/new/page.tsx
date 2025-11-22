@@ -1,3 +1,5 @@
+// src/app/admin/articles/new/page.tsx
+
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -10,14 +12,14 @@ import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import RichEditor from '@/components/editor/rich-editor'
-import { 
-  Save, 
-  Eye, 
-  Send, 
+import {
+  Save,
+  Eye,
+  Send,
   ArrowLeft,
   Plus,
   X,
-  Loader2
+  Loader2,
 } from 'lucide-react'
 
 const articleTypes = [
@@ -25,7 +27,7 @@ const articleTypes = [
   { value: 'BEST_LIST', label: 'En İyi Listeler' },
   { value: 'COMPARE', label: 'Karşılaştırma' },
   { value: 'GUIDE', label: 'Rehber' },
-  { value: 'NEWS', label: 'Haber' }
+  { value: 'NEWS', label: 'Haber' },
 ]
 
 interface Category {
@@ -41,6 +43,32 @@ interface Tag {
   type: string
 }
 
+interface ReviewScores {
+  performance: number
+  stability: number
+  coverage: number
+  software: number
+  value: number
+}
+
+/** BEST LIST tipleri */
+interface BestListItemDraft {
+  title: string
+  description: string
+  image: string
+  imageFile: File | null
+  imagePreview: string | null
+  pros: string[]
+  cons: string[]
+  price: string
+  rating: number
+  link: string
+}
+
+interface BestListItem extends BestListItemDraft {
+  id: string
+}
+
 export default function NewArticlePage() {
   const router = useRouter()
   const [categories, setCategories] = useState<Category[]>([])
@@ -51,7 +79,7 @@ export default function NewArticlePage() {
   const [tagsLoading, setTagsLoading] = useState(true)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
-  
+
   const [formData, setFormData] = useState({
     type: 'REVIEW',
     title: '',
@@ -61,43 +89,32 @@ export default function NewArticlePage() {
     category: '',
     heroImage: '',
     metaTitle: '',
-    metaDescription: ''
+    metaDescription: '',
   })
 
-  const [reviewScores, setReviewScores] = useState({
+  const [reviewScores, setReviewScores] = useState<ReviewScores>({
     performance: 5,
     stability: 5,
     coverage: 5,
     software: 5,
-    value: 5
+    value: 5,
   })
-  const [totalScore, setTotalScore] = useState(5) // Will be calculated automatically
-  
+
+  const [totalScore, setTotalScore] = useState(5)
+
   // Best list specific state
-  const [bestListItems, setBestListItems] = useState<Array<{
-    id: string
-    title: string
-    description: string
-    image: string
-    imageFile?: File
-    imagePreview?: string
-    pros: string[]
-    cons: string[]
-    price: string
-    rating: number
-    link: string
-  }>>([])
-  const [newBestListItem, setNewBestListItem] = useState({
+  const [bestListItems, setBestListItems] = useState<BestListItem[]>([])
+  const [newBestListItem, setNewBestListItem] = useState<BestListItemDraft>({
     title: '',
     description: '',
     image: '',
-    imageFile: null as File | null,
-    imagePreview: null as string | null,
-    pros: [] as string[],
-    cons: [] as string[],
+    imageFile: null,
+    imagePreview: null,
+    pros: [],
+    cons: [],
     price: '',
     rating: 5,
-    link: ''
+    link: '',
   })
 
   useEffect(() => {
@@ -110,7 +127,7 @@ export default function NewArticlePage() {
       setCategoriesLoading(true)
       const response = await fetch('/api/categories')
       const data = await response.json()
-      
+
       if (data.success) {
         setCategories(data.data)
       } else {
@@ -130,7 +147,7 @@ export default function NewArticlePage() {
       setTagsLoading(true)
       const response = await fetch('/api/tags')
       const data = await response.json()
-      
+
       if (data.success) {
         setTags(data.data)
       } else {
@@ -145,11 +162,15 @@ export default function NewArticlePage() {
     }
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
+  ) => {
     const { name, value } = e.target
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }))
   }
 
@@ -168,25 +189,27 @@ export default function NewArticlePage() {
   const handleRemoveImage = () => {
     setImageFile(null)
     setImagePreview(null)
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      heroImage: ''
+      heroImage: '',
     }))
   }
 
-  const handleBestListItemImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBestListItemImageChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = e.target.files?.[0]
     if (file) {
       setNewBestListItem({
         ...newBestListItem,
         imageFile: file,
-        image: '' // Clear URL when file is selected
+        image: '',
       })
       const reader = new FileReader()
       reader.onload = (e) => {
-        setNewBestListItem(prev => ({
+        setNewBestListItem((prev) => ({
           ...prev,
-          imagePreview: e.target?.result as string
+          imagePreview: e.target?.result as string,
         }))
       }
       reader.readAsDataURL(file)
@@ -198,34 +221,31 @@ export default function NewArticlePage() {
       ...newBestListItem,
       imageFile: null,
       imagePreview: null,
-      image: ''
+      image: '',
     })
   }
 
-
   const handleTagToggle = (tagId: number) => {
-    setSelectedTags(prev => 
-      prev.includes(tagId) 
-        ? prev.filter(id => id !== tagId)
-        : [...prev, tagId]
+    setSelectedTags((prev) =>
+      prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]
     )
   }
 
-  const handleScoreChange = (newScores: Record<string, number>) => {
+  const handleScoreChange = (newScores: ReviewScores) => {
     setReviewScores(newScores)
-    
-    // Calculate total score as average of all scores
+
     const scores = Object.values(newScores)
-    const average = scores.reduce((sum, score) => sum + score, 0) / scores.length
+    const average =
+      scores.reduce((sum, score) => sum + score, 0) / scores.length
     setTotalScore(average)
   }
 
   // Best list functions
   const addBestListItem = () => {
     if (newBestListItem.title.trim()) {
-      const item = {
+      const item: BestListItem = {
+        id: Date.now().toString(),
         ...newBestListItem,
-        id: Date.now().toString()
       }
       setBestListItems([...bestListItems, item])
       setNewBestListItem({
@@ -238,20 +258,20 @@ export default function NewArticlePage() {
         cons: [],
         price: '',
         rating: 5,
-        link: ''
+        link: '',
       })
     }
   }
 
   const removeBestListItem = (id: string) => {
-    setBestListItems(bestListItems.filter(item => item.id !== id))
+    setBestListItems(bestListItems.filter((item) => item.id !== id))
   }
 
   const addPro = (pro: string) => {
     if (pro.trim()) {
       setNewBestListItem({
         ...newBestListItem,
-        pros: [...newBestListItem.pros, pro]
+        pros: [...newBestListItem.pros, pro],
       })
     }
   }
@@ -259,7 +279,7 @@ export default function NewArticlePage() {
   const removePro = (index: number) => {
     setNewBestListItem({
       ...newBestListItem,
-      pros: newBestListItem.pros.filter((_, i) => i !== index)
+      pros: newBestListItem.pros.filter((_, i) => i !== index),
     })
   }
 
@@ -267,7 +287,7 @@ export default function NewArticlePage() {
     if (con.trim()) {
       setNewBestListItem({
         ...newBestListItem,
-        cons: [...newBestListItem.cons, con]
+        cons: [...newBestListItem.cons, con],
       })
     }
   }
@@ -275,7 +295,7 @@ export default function NewArticlePage() {
   const removeCon = (index: number) => {
     setNewBestListItem({
       ...newBestListItem,
-      cons: newBestListItem.cons.filter((_, i) => i !== index)
+      cons: newBestListItem.cons.filter((_, i) => i !== index),
     })
   }
 
@@ -297,7 +317,7 @@ export default function NewArticlePage() {
 
     try {
       setLoading(true)
-      
+
       const formDataToSend = new FormData()
       formDataToSend.append('title', formData.title)
       formDataToSend.append('subtitle', formData.subtitle)
@@ -308,44 +328,47 @@ export default function NewArticlePage() {
       formDataToSend.append('status', status.toUpperCase())
       formDataToSend.append('metaTitle', formData.metaTitle)
       formDataToSend.append('metaDescription', formData.metaDescription)
-      
+
       // Add tags
       console.log('Selected tags before sending:', selectedTags)
-      selectedTags.forEach(tagId => {
+      selectedTags.forEach((tagId) => {
         formDataToSend.append('tags', tagId.toString())
       })
-      
+
       // Add image file if selected
       if (imageFile) {
         formDataToSend.append('hero_image_file', imageFile)
       } else if (formData.heroImage) {
         formDataToSend.append('heroImage', formData.heroImage)
       }
-      
+
       // Add review scores if it's a review
       if (formData.type === 'REVIEW') {
         formDataToSend.append('scores', JSON.stringify(reviewScores))
         formDataToSend.append('totalScore', totalScore.toString())
       }
-      
+
       // Add best list items if it's a best list
       if (formData.type === 'BEST_LIST') {
-        // Process best list items and handle file uploads
         const processedBestListItems = bestListItems.map((item, index) => {
           const processedItem = { ...item }
-          
-          // If there's a file, we'll handle it separately
+
           if (item.imageFile) {
-            formDataToSend.append(`best_list_item_${index}_image_file`, item.imageFile)
-            // Remove the file from the JSON data
-            delete processedItem.imageFile
-            delete processedItem.imagePreview
+            formDataToSend.append(
+              `best_list_item_${index}_image_file`,
+              item.imageFile
+            )
+            delete (processedItem as any).imageFile
+            delete (processedItem as any).imagePreview
           }
-          
+
           return processedItem
         })
-        
-        formDataToSend.append('bestListItems', JSON.stringify(processedBestListItems))
+
+        formDataToSend.append(
+          'bestListItems',
+          JSON.stringify(processedBestListItems)
+        )
       }
 
       const response = await fetch('/api/articles', {
@@ -373,7 +396,10 @@ export default function NewArticlePage() {
     <div className="container py-8">
       <div className="mb-8">
         <div className="flex items-center gap-4 mb-4">
-          <Button variant="outline" onClick={() => router.push('/admin/articles')}>
+          <Button
+            variant="outline"
+            onClick={() => router.push('/admin/articles')}
+          >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Geri Dön
           </Button>
@@ -468,7 +494,9 @@ export default function NewArticlePage() {
                     ))}
                   </select>
                   {categoriesLoading && (
-                    <p className="text-sm text-muted-foreground mt-1">Kategoriler yükleniyor...</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Kategoriler yükleniyor...
+                    </p>
                   )}
                 </div>
               </div>
@@ -486,7 +514,9 @@ export default function NewArticlePage() {
                 <div className="mt-2">
                   <RichEditor
                     content={formData.content}
-                    onChange={(content) => setFormData(prev => ({ ...prev, content }))}
+                    onChange={(content) =>
+                      setFormData((prev) => ({ ...prev, content }))
+                    }
                     placeholder="Makale içeriğinizi yazın..."
                   />
                 </div>
@@ -500,14 +530,17 @@ export default function NewArticlePage() {
               <CardTitle>Etiketler</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Tag Selection */}
               <div>
                 <Label>Mevcut Etiketlerden Seç</Label>
                 <div className="mt-2 max-h-32 overflow-y-auto border rounded-md p-2">
                   {tagsLoading ? (
-                    <p className="text-sm text-muted-foreground">Etiketler yükleniyor...</p>
+                    <p className="text-sm text-muted-foreground">
+                      Etiketler yükleniyor...
+                    </p>
                   ) : tags.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Henüz etiket bulunmuyor</p>
+                    <p className="text-sm text-muted-foreground">
+                      Henüz etiket bulunmuyor
+                    </p>
                   ) : (
                     <div className="flex flex-wrap gap-2">
                       {tags.map((tag) => {
@@ -536,7 +569,6 @@ export default function NewArticlePage() {
                   </p>
                 )}
               </div>
-
             </CardContent>
           </Card>
 
@@ -576,7 +608,11 @@ export default function NewArticlePage() {
                 <div className="flex items-center gap-4 mt-1">
                   <div className="w-24 h-24 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
                     {imagePreview ? (
-                      <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                      <img
+                        src={imagePreview}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                      />
                     ) : (
                       <Eye className="w-8 h-8 text-muted-foreground" />
                     )}
@@ -594,7 +630,9 @@ export default function NewArticlePage() {
                       JPG, PNG veya GIF formatında, maksimum 5MB
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {imageFile ? `Seçilen dosya: ${imageFile.name}` : 'Dosya seçilmedi'}
+                      {imageFile
+                        ? `Seçilen dosya: ${imageFile.name}`
+                        : 'Dosya seçilmedi'}
                     </p>
                     {(imageFile || imagePreview) && (
                       <Button
@@ -615,8 +653,8 @@ export default function NewArticlePage() {
 
           {/* Actions */}
           <div className="flex gap-4">
-            <Button 
-              onClick={() => handleSave('DRAFT')} 
+            <Button
+              onClick={() => handleSave('DRAFT')}
               disabled={loading}
               variant="outline"
             >
@@ -633,8 +671,8 @@ export default function NewArticlePage() {
               )}
             </Button>
 
-            <Button 
-              onClick={() => handleSave('PUBLISHED')} 
+            <Button
+              onClick={() => handleSave('PUBLISHED')}
               disabled={loading}
             >
               {loading ? (
@@ -669,14 +707,16 @@ export default function NewArticlePage() {
                       min="1"
                       max="10"
                       value={reviewScores.performance}
-                      onChange={(e) => handleScoreChange({
-                        ...reviewScores,
-                        performance: parseInt(e.target.value)
-                      })}
+                      onChange={(e) =>
+                        handleScoreChange({
+                          ...reviewScores,
+                          performance: parseInt(e.target.value),
+                        })
+                      }
                       className="w-full mt-1"
                     />
                   </div>
-                  
+
                   <div>
                     <Label>Kararlılık: {reviewScores.stability}/10</Label>
                     <input
@@ -684,10 +724,12 @@ export default function NewArticlePage() {
                       min="1"
                       max="10"
                       value={reviewScores.stability}
-                      onChange={(e) => handleScoreChange({
-                        ...reviewScores,
-                        stability: parseInt(e.target.value)
-                      })}
+                      onChange={(e) =>
+                        handleScoreChange({
+                          ...reviewScores,
+                          stability: parseInt(e.target.value),
+                        })
+                      }
                       className="w-full mt-1"
                     />
                   </div>
@@ -699,10 +741,12 @@ export default function NewArticlePage() {
                       min="1"
                       max="10"
                       value={reviewScores.coverage}
-                      onChange={(e) => handleScoreChange({
-                        ...reviewScores,
-                        coverage: parseInt(e.target.value)
-                      })}
+                      onChange={(e) =>
+                        handleScoreChange({
+                          ...reviewScores,
+                          coverage: parseInt(e.target.value),
+                        })
+                      }
                       className="w-full mt-1"
                     />
                   </div>
@@ -714,10 +758,12 @@ export default function NewArticlePage() {
                       min="1"
                       max="10"
                       value={reviewScores.software}
-                      onChange={(e) => handleScoreChange({
-                        ...reviewScores,
-                        software: parseInt(e.target.value)
-                      })}
+                      onChange={(e) =>
+                        handleScoreChange({
+                          ...reviewScores,
+                          software: parseInt(e.target.value),
+                        })
+                      }
                       className="w-full mt-1"
                     />
                   </div>
@@ -729,17 +775,21 @@ export default function NewArticlePage() {
                       min="1"
                       max="10"
                       value={reviewScores.value}
-                      onChange={(e) => handleScoreChange({
-                        ...reviewScores,
-                        value: parseInt(e.target.value)
-                      })}
+                      onChange={(e) =>
+                        handleScoreChange({
+                          ...reviewScores,
+                          value: parseInt(e.target.value),
+                        })
+                      }
                       className="w-full mt-1"
                     />
                   </div>
 
                   <div className="text-center p-4 bg-muted rounded-lg">
                     <div className="text-2xl font-bold">Genel Puan</div>
-                    <div className="text-4xl font-bold text-primary">{totalScore.toFixed(1)}/10</div>
+                    <div className="text-4xl font-bold text-primary">
+                      {totalScore.toFixed(1)}/10
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -760,10 +810,12 @@ export default function NewArticlePage() {
                     <Input
                       id="item-title"
                       value={newBestListItem.title}
-                      onChange={(e) => setNewBestListItem({
-                        ...newBestListItem,
-                        title: e.target.value
-                      })}
+                      onChange={(e) =>
+                        setNewBestListItem({
+                          ...newBestListItem,
+                          title: e.target.value,
+                        })
+                      }
                       placeholder="Ürün adı..."
                       className="mt-1"
                     />
@@ -774,10 +826,12 @@ export default function NewArticlePage() {
                     <Textarea
                       id="item-description"
                       value={newBestListItem.description}
-                      onChange={(e) => setNewBestListItem({
-                        ...newBestListItem,
-                        description: e.target.value
-                      })}
+                      onChange={(e) =>
+                        setNewBestListItem({
+                          ...newBestListItem,
+                          description: e.target.value,
+                        })
+                      }
                       placeholder="Ürün açıklaması..."
                       className="mt-1"
                     />
@@ -789,10 +843,12 @@ export default function NewArticlePage() {
                       <Input
                         id="item-price"
                         value={newBestListItem.price}
-                        onChange={(e) => setNewBestListItem({
-                          ...newBestListItem,
-                          price: e.target.value
-                        })}
+                        onChange={(e) =>
+                          setNewBestListItem({
+                            ...newBestListItem,
+                            price: e.target.value,
+                          })
+                        }
                         placeholder="₺1,000"
                         className="mt-1"
                       />
@@ -802,13 +858,15 @@ export default function NewArticlePage() {
                       <Input
                         id="item-rating"
                         type="number"
-                        min="1"
-                        max="10"
+                        min={1}
+                        max={10}
                         value={newBestListItem.rating}
-                        onChange={(e) => setNewBestListItem({
-                          ...newBestListItem,
-                          rating: parseInt(e.target.value) || 5
-                        })}
+                        onChange={(e) =>
+                          setNewBestListItem({
+                            ...newBestListItem,
+                            rating: parseInt(e.target.value) || 5,
+                          })
+                        }
                         className="mt-1"
                       />
                     </div>
@@ -819,9 +877,17 @@ export default function NewArticlePage() {
                     <div className="flex items-center gap-4 mt-1">
                       <div className="w-24 h-24 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
                         {newBestListItem.imagePreview ? (
-                          <img src={newBestListItem.imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                          <img
+                            src={newBestListItem.imagePreview}
+                            alt="Preview"
+                            className="w-full h-full object-cover"
+                          />
                         ) : newBestListItem.image ? (
-                          <img src={newBestListItem.image} alt="Preview" className="w-full h-full object-cover" />
+                          <img
+                            src={newBestListItem.image}
+                            alt="Preview"
+                            className="w-full h-full object-cover"
+                          />
                         ) : (
                           <Eye className="w-8 h-8 text-muted-foreground" />
                         )}
@@ -838,10 +904,15 @@ export default function NewArticlePage() {
                           JPG, PNG veya GIF formatında, maksimum 5MB
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {newBestListItem.imageFile ? `Seçilen dosya: ${newBestListItem.imageFile.name}` : 
-                           newBestListItem.image ? 'URL kullanılıyor' : 'Dosya seçilmedi'}
+                          {newBestListItem.imageFile
+                            ? `Seçilen dosya: ${newBestListItem.imageFile.name}`
+                            : newBestListItem.image
+                            ? 'URL kullanılıyor'
+                            : 'Dosya seçilmedi'}
                         </p>
-                        {(newBestListItem.imageFile || newBestListItem.imagePreview || newBestListItem.image) && (
+                        {(newBestListItem.imageFile ||
+                          newBestListItem.imagePreview ||
+                          newBestListItem.image) && (
                           <Button
                             type="button"
                             variant="outline"
@@ -854,20 +925,22 @@ export default function NewArticlePage() {
                         )}
                       </div>
                     </div>
-                    {/* Fallback URL input */}
-                    {!newBestListItem.imageFile && !newBestListItem.imagePreview && (
-                      <div className="mt-2">
-                        <Input
-                          value={newBestListItem.image}
-                          onChange={(e) => setNewBestListItem({
-                            ...newBestListItem,
-                            image: e.target.value
-                          })}
-                          placeholder="Veya görsel URL'si girin..."
-                          className="mt-1"
-                        />
-                      </div>
-                    )}
+                    {!newBestListItem.imageFile &&
+                      !newBestListItem.imagePreview && (
+                        <div className="mt-2">
+                          <Input
+                            value={newBestListItem.image}
+                            onChange={(e) =>
+                              setNewBestListItem({
+                                ...newBestListItem,
+                                image: e.target.value,
+                              })
+                            }
+                            placeholder="Veya görsel URL'si girin..."
+                            className="mt-1"
+                          />
+                        </div>
+                      )}
                   </div>
 
                   <div>
@@ -875,10 +948,12 @@ export default function NewArticlePage() {
                     <Input
                       id="item-link"
                       value={newBestListItem.link}
-                      onChange={(e) => setNewBestListItem({
-                        ...newBestListItem,
-                        link: e.target.value
-                      })}
+                      onChange={(e) =>
+                        setNewBestListItem({
+                          ...newBestListItem,
+                          link: e.target.value,
+                        })
+                      }
                       placeholder="https://example.com/product"
                       className="mt-1"
                     />
@@ -890,7 +965,10 @@ export default function NewArticlePage() {
                       <Label>Artılar</Label>
                       <div className="space-y-2">
                         {newBestListItem.pros.map((pro, index) => (
-                          <div key={index} className="flex items-center gap-2">
+                          <div
+                            key={index}
+                            className="flex items-center gap-2"
+                          >
                             <Input
                               value={pro}
                               onChange={(e) => {
@@ -898,7 +976,7 @@ export default function NewArticlePage() {
                                 newPros[index] = e.target.value
                                 setNewBestListItem({
                                   ...newBestListItem,
-                                  pros: newPros
+                                  pros: newPros,
                                 })
                               }}
                               placeholder="Artı..."
@@ -932,7 +1010,10 @@ export default function NewArticlePage() {
                       <Label>Eksiler</Label>
                       <div className="space-y-2">
                         {newBestListItem.cons.map((con, index) => (
-                          <div key={index} className="flex items-center gap-2">
+                          <div
+                            key={index}
+                            className="flex items-center gap-2"
+                          >
                             <Input
                               value={con}
                               onChange={(e) => {
@@ -940,7 +1021,7 @@ export default function NewArticlePage() {
                                 newCons[index] = e.target.value
                                 setNewBestListItem({
                                   ...newBestListItem,
-                                  cons: newCons
+                                  cons: newCons,
                                 })
                               }}
                               placeholder="Eksi..."
@@ -986,8 +1067,11 @@ export default function NewArticlePage() {
                 {bestListItems.length > 0 && (
                   <div className="space-y-2">
                     <Label>Eklenen Öğeler ({bestListItems.length})</Label>
-                    {bestListItems.map((item, index) => (
-                      <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    {bestListItems.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center justify-between p-3 border rounded-lg"
+                      >
                         <div className="flex-1">
                           <div className="font-medium">{item.title}</div>
                           <div className="text-sm text-muted-foreground">

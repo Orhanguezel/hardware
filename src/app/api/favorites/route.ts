@@ -1,3 +1,5 @@
+// src/app/api/favorites/route.ts
+
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -7,18 +9,24 @@ import { DJANGO_API_URL } from '@/lib/api'
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.id) {
+
+    const user = session?.user as any
+    const userId = user?.id
+    const accessToken = (session as any)?.accessToken as string | undefined
+
+    if (!userId) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 401 }
       )
     }
 
-    // Check if user has access token
-    if (!(session as any).accessToken) {
+    if (!accessToken) {
       return NextResponse.json(
-        { success: false, error: 'User not authenticated. Please login again.' },
+        {
+          success: false,
+          error: 'User not authenticated. Please login again.',
+        },
         { status: 401 }
       )
     }
@@ -27,13 +35,16 @@ export async function GET(request: NextRequest) {
     const page = searchParams.get('page') || '1'
     const limit = searchParams.get('limit') || '10'
 
-    const response = await fetch(`${DJANGO_API_URL}/users/${session.user.id}/favorites/?page=${page}&limit=${limit}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Token ${session.accessToken || ''}`,
-      },
-    })
+    const response = await fetch(
+      `${DJANGO_API_URL}/users/${userId}/favorites/?page=${page}&limit=${limit}`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Token ${accessToken}`,
+        },
+      }
+    )
 
     if (!response.ok) {
       throw new Error(`Django API error: ${response.status}`)
@@ -41,22 +52,25 @@ export async function GET(request: NextRequest) {
 
     const data = await response.json()
     console.log('Favorites API Response:', data)
+
+    const total = Array.isArray(data) ? data.length : 0
+
     return NextResponse.json({
       success: true,
       data: data || [],
       meta: {
         page: parseInt(page),
         limit: parseInt(limit),
-        total: data.length || 0,
-        totalPages: Math.ceil((data.length || 0) / parseInt(limit))
-      }
+        total,
+        totalPages: Math.ceil(total / parseInt(limit)),
+      },
     })
   } catch (error) {
     console.error('Error fetching favorites:', error)
     return NextResponse.json(
-      { 
-        success: false, 
-        error: 'Failed to fetch favorites'
+      {
+        success: false,
+        error: 'Failed to fetch favorites',
       },
       { status: 500 }
     )
@@ -67,18 +81,24 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.id) {
+
+    const user = session?.user as any
+    const userId = user?.id
+    const accessToken = (session as any)?.accessToken as string | undefined
+
+    if (!userId) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 401 }
       )
     }
 
-    // Check if user has access token
-    if (!(session as any).accessToken) {
+    if (!accessToken) {
       return NextResponse.json(
-        { success: false, error: 'User not authenticated. Please login again.' },
+        {
+          success: false,
+          error: 'User not authenticated. Please login again.',
+        },
         { status: 401 }
       )
     }
@@ -98,65 +118,87 @@ export async function POST(request: NextRequest) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Token ${session.accessToken || ''}`,
+          Authorization: `Token ${accessToken}`,
         },
         body: JSON.stringify({
-          product_id: productId
+          product_id: productId,
         }),
       })
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        if (response.status === 400 && errorData.error?.includes('already')) {
+        const errorData = await response.json().catch(() => ({} as any))
+
+        if (
+          response.status === 400 &&
+          (errorData as any).error?.includes('already')
+        ) {
           return NextResponse.json({
             success: true,
             message: 'Product already in favorites',
-            isFavorite: true
+            isFavorite: true,
           })
         }
-        if (response.status === 500 && errorData.detail?.includes('duplicate key')) {
+
+        if (
+          response.status === 500 &&
+          (errorData as any).detail?.includes('duplicate key')
+        ) {
           return NextResponse.json({
             success: true,
             message: 'Product already in favorites',
-            isFavorite: true
+            isFavorite: true,
           })
         }
+
         throw new Error(`Django API error: ${response.status}`)
       }
 
-      const data = await response.json()
+      await response.json().catch(() => ({}))
       return NextResponse.json({
         success: true,
         message: 'Product added to favorites',
-        isFavorite: true
+        isFavorite: true,
       })
     } else if (action === 'remove') {
       // Favoriden çıkar - önce favoriyi bul
       console.log('Removing favorite for product:', productId)
-      const favoritesResponse = await fetch(`${DJANGO_API_URL}/users/${session.user.id}/favorites/?product=${productId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Token ${session.accessToken || ''}`,
-        },
-      })
+
+      const favoritesResponse = await fetch(
+        `${DJANGO_API_URL}/users/${userId}/favorites/?product=${productId}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Token ${accessToken}`,
+          },
+        }
+      )
 
       console.log('Favorites response status:', favoritesResponse.status)
-      
+
       if (favoritesResponse.ok) {
         const favoritesData = await favoritesResponse.json()
         console.log('Favorites data:', favoritesData)
-        const favorite = favoritesData.find((fav: any) => fav.product.id == productId)
+
+        const favorite = Array.isArray(favoritesData)
+          ? favoritesData.find(
+              (fav: any) => fav.product?.id == productId
+            )
+          : null
+
         console.log('Found favorite:', favorite)
-        
+
         if (favorite) {
           console.log('Deleting favorite with ID:', favorite.id)
-          const deleteResponse = await fetch(`${DJANGO_API_URL}/favorites/${favorite.id}/`, {
-            method: 'DELETE',
-            headers: {
-              'Authorization': `Token ${session.accessToken || ''}`,
-            },
-          })
+          const deleteResponse = await fetch(
+            `${DJANGO_API_URL}/favorites/${favorite.id}/`,
+            {
+              method: 'DELETE',
+              headers: {
+                Authorization: `Token ${accessToken}`,
+              },
+            }
+          )
 
           console.log('Delete response status:', deleteResponse.status)
           if (!deleteResponse.ok) {
@@ -172,11 +214,11 @@ export async function POST(request: NextRequest) {
         console.log('Favorites fetch error:', errorData)
         throw new Error(`Django API error: ${favoritesResponse.status}`)
       }
-      
+
       return NextResponse.json({
         success: true,
         message: 'Product removed from favorites',
-        isFavorite: false
+        isFavorite: false,
       })
     } else {
       return NextResponse.json(
@@ -187,9 +229,9 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error managing favorites:', error)
     return NextResponse.json(
-      { 
-        success: false, 
-        error: 'Failed to manage favorites'
+      {
+        success: false,
+        error: 'Failed to manage favorites',
       },
       { status: 500 }
     )

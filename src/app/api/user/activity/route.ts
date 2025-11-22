@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Token ${session.accessToken || ''}`,
+        'Authorization': `Token ${(session as any).accessToken}`
       },
     })
 
