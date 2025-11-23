@@ -1,24 +1,23 @@
-// hardware/src/lib/api.ts
+// =========================
+// frontend/src/lib/api.ts
+// =========================
 
 const isServer = typeof window === "undefined";
 
 /**
  * Server tarafı (Next.js, build, API route’lar) için:
- *  - DJANGO_API_URL (env) yoksa 127.0.0.1:8001 kullan
- *  - DİKKAT: Burada /api yok, direkt root
+ *  - DJANGO_API_URL (env) yoksa 127.0.0.1:8001/api kullan
  */
 export const DJANGO_API_URL =
-  process.env.DJANGO_API_URL || "http://127.0.0.1:8001";
+  process.env.DJANGO_API_URL || "http://127.0.0.1:8001/api";
 
 /**
  * Browser tarafı için:
  *  - NEXT_PUBLIC_API_URL (env) yoksa local fallback
- *  - Burada da /api yok, direkt root
  */
 const API_BASE_URL = isServer
   ? DJANGO_API_URL
-  : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
-
+  : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001/api";
 
 /* ---------- Ortak response tipleri ---------- */
 
@@ -44,7 +43,6 @@ interface AuthUser {
   id: string;
   email: string;
   name: string | null;
-  // Backend başka alanlar da döndürüyorsa onları da ekleyebilirsin
   [key: string]: unknown;
 }
 
@@ -72,8 +70,6 @@ class ApiClient {
       this.token = localStorage.getItem("auth_token");
     }
   }
-
-  /* ---------- Header merge + request helper ---------- */
 
   private buildHeaders(optionsHeaders?: HeadersInit): Record<string, string> {
     const headers: Record<string, string> = {
@@ -106,7 +102,6 @@ class ApiClient {
     options: RequestInit = {}
   ): Promise<TResponse> {
     const url = `${this.baseURL}${endpoint}`;
-
     const headers = this.buildHeaders(options.headers);
 
     const response = await fetch(url, {
@@ -199,7 +194,6 @@ class ApiClient {
       ? `/categories/?${queryString}`
       : "/categories/";
 
-    // Burada kategori tipi belli değilse unknown kullanıyoruz
     return this.request<PaginatedResponse<unknown>>(endpoint);
   }
 
