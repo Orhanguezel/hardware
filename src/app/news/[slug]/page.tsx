@@ -1,187 +1,231 @@
-import { notFound } from 'next/navigation'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { ArrowLeft, Calendar, User, Clock, Newspaper } from 'lucide-react'
-import Link from 'next/link'
-import CommentSystem from '@/components/comments/comment-system'
-import ArticleViewTrackerWrapper from '@/components/tracking/ArticleViewTrackerWrapper'
-import { DJANGO_API_URL } from '@/lib/api'
+// src/app/news/[slug]/page.tsx
+
+import { notFound } from "next/navigation";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import Images from "next/image";
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, Calendar, User, Newspaper } from "lucide-react";
+import Link from "next/link";
+import CommentSystem from "@/components/comments/comment-system";
+import ArticleViewTrackerWrapper from "@/components/tracking/ArticleViewTrackerWrapper";
+import { DJANGO_API_URL } from "@/lib/api";
+
+interface NewsTag {
+  id: number;
+  name: string;
+  slug: string;
+  type: string;
+}
 
 interface NewsDetail {
-  id: number
-  title: string
-  subtitle?: string
-  excerpt?: string
-  slug: string
-  type: string
-  status: string
-  published_at: string
+  id: number;
+  title: string;
+  subtitle?: string;
+  excerpt?: string;
+  slug: string;
+  type: string;
+  status: string;
+  published_at: string;
   author: {
-    id: number
-    first_name: string
-    last_name: string
-    username: string
-    email: string
-  }
+    id: number;
+    first_name: string;
+    last_name: string;
+    username: string;
+    email: string;
+  };
   category: {
-    id: number
-    name: string
-    slug: string
-  }
-  article_tags?: Array<{
-    id: number
-    name: string
-    slug: string
-    type: string
-  }>
-  hero_image?: string
-  content: string | {
-    html: string
-  }
-  comment_count: number
-  created_at: string
+    id: number;
+    name: string;
+    slug: string;
+  };
+  article_tags?: NewsTag[];
+  hero_image?: string;
+  content:
+    | string
+    | {
+        html: string;
+      };
+  comment_count: number;
+  created_at: string;
 }
+
+// DJANGO_API_URL .env’de şu şekilde olmalı:
+// DJANGO_API_URL=http://127.0.0.1:8001/api
+const API_BASE =
+  DJANGO_API_URL || process.env.DJANGO_API_URL || "http://127.0.0.1:8001/api";
 
 async function getNews(slug: string): Promise<NewsDetail | null> {
   try {
-    const url = `http://localhost:8000/api/articles/${slug}/`
-    console.log('Fetching news from Django API:', url)
-    
-    const response = await fetch(url, {
-      cache: 'no-store',
-    })
+    const url = `${API_BASE}/articles/${encodeURIComponent(slug)}/`;
+    console.log("Fetching news from Django API:", url);
 
-    console.log('Response status:', response.status)
-    console.log('Response ok:', response.ok)
+    const response = await fetch(url, {
+      // Haber detayı her istekte taze olsun istiyorsan:
+      cache: "no-store",
+    });
+
+    console.log("Response status:", response.status);
+    console.log("Response ok:", response.ok);
 
     if (!response.ok) {
-      const errorText = await response.text()
-      console.error(`Failed to fetch news: ${response.status} ${response.statusText}`)
-      console.error('Error response:', errorText)
-      return null
+      const errorText = await response.text();
+      console.error(
+        `Failed to fetch news: ${response.status} ${response.statusText}`,
+      );
+      console.error("Error response:", errorText);
+      return null;
     }
 
-    const data = await response.json()
-    console.log('News data:', data)
-    
-    // Check if it's a NEWS type article
-    if (data.type === 'NEWS') {
-      return data as NewsDetail
+    const data = (await response.json()) as NewsDetail;
+
+    // NEWS tipinde değilse 404 ver
+    if (data.type === "NEWS") {
+      return data;
     }
-    return null
+    return null;
   } catch (error) {
-    console.error('Error fetching news:', error)
-    return null
+    console.error("Error fetching news:", error);
+    return null;
   }
 }
 
 export async function generateStaticParams() {
   try {
-    const response = await fetch(`http://localhost:8000/api/articles/?type=NEWS&status=PUBLISHED`, {
-      cache: 'no-store',
-    })
-    
-    if (!response.ok) {
-      console.error('Failed to fetch news for static params:', response.status)
-      return []
-    }
-    
-    const result = await response.json()
-    const news = result.results || result
+    const url = `${API_BASE}/articles/?type=NEWS&status=PUBLISHED`;
+    const response = await fetch(url, {
+      // static params için cache kullanılması daha sağlıklı
+      // istersen revalidate süresi verebilirsin:
+      // next: { revalidate: 300 },
+    });
 
-    return news.map((newsItem: NewsDetail) => ({
+    if (!response.ok) {
+      console.error(
+        "Failed to fetch news for static params:",
+        response.status,
+      );
+      return [];
+    }
+
+    const result = await response.json();
+    const news: NewsDetail[] = Array.isArray(result.results)
+      ? result.results
+      : Array.isArray(result)
+        ? result
+        : [];
+
+    return news.map((newsItem) => ({
       slug: newsItem.slug,
-    }))
+    }));
   } catch (error) {
-    console.error('Error generating static params for news:', error)
-    return []
+    console.error("Error generating static params for news:", error);
+    // Hata olsa bile boş array dönüp build'in tamamlanmasını sağla
+    return [];
   }
 }
 
-export default async function NewsPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params
-  const news = await getNews(slug)
+// NOT: Burada params Promise DEĞİL, direkt object olmalı
+export default async function NewsPage({
+  params,
+}: {
+  params: { slug: string };
+}) {
+  const { slug } = params;
+  const news = await getNews(slug);
 
-  if (!news || news.type !== 'NEWS') {
-    notFound()
+  if (!news || news.type !== "NEWS") {
+    notFound();
   }
 
   return (
     <div className="container py-8">
       <ArticleViewTrackerWrapper articleId={news.id} />
-      <div className="max-w-4xl mx-auto">
-        <Link href="/news" className="inline-flex items-center text-sm text-muted-foreground hover:text-primary mb-4">
-          <ArrowLeft className="w-4 h-4 mr-1" /> Tüm Haberler
+      <div className="mx-auto max-w-4xl">
+        <Link
+          href="/news"
+          className="mb-4 inline-flex items-center text-sm text-muted-foreground hover:text-primary"
+        >
+          <ArrowLeft className="mr-1 h-4 w-4" /> Tüm Haberler
         </Link>
 
         <Card className="mb-8">
           {news.hero_image && (
             <div className="aspect-video overflow-hidden rounded-t-lg">
-              <img
+              <Images
                 src={news.hero_image}
                 alt={news.title}
-                className="w-full h-full object-cover"
+                width={800}
+                height={450}
+                className="h-full w-full object-cover"
               />
             </div>
           )}
-          
+
           <CardHeader className="pb-4">
-            <div className="flex items-center gap-2 mb-4">
+            <div className="mb-4 flex items-center gap-2">
               <Badge variant="secondary" className="w-fit">
-                {news.category?.name || 'Genel'}
+                {news.category?.name || "Genel"}
               </Badge>
               <Badge variant="outline">
-                <Newspaper className="w-3 h-3 mr-1" />
+                <Newspaper className="mr-1 h-3 w-3" />
                 Haber
               </Badge>
             </div>
-            
-            <CardTitle className="text-4xl font-extrabold leading-tight mb-2">
+
+            <CardTitle className="mb-2 text-4xl font-extrabold leading-tight">
               {news.title}
             </CardTitle>
-            
+
             {news.subtitle && (
-              <p className="text-xl text-muted-foreground mb-4">{news.subtitle}</p>
+              <p className="mb-4 text-xl text-muted-foreground">
+                {news.subtitle}
+              </p>
             )}
 
-            {/* Tags */}
             {news.article_tags && news.article_tags.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-4">
-                {news.article_tags.map((tag: any) => (
+              <div className="mb-4 flex flex-wrap gap-2">
+                {news.article_tags.map((tag) => (
                   <Badge key={tag.id} variant="outline" className="text-sm">
                     {tag.name}
                   </Badge>
                 ))}
               </div>
             )}
-            
+
             <div className="flex items-center gap-6 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
-                <User className="w-4 h-4" />
-                <span>{news.author.first_name} {news.author.last_name}</span>
+                <User className="h-4 w-4" />
+                <span>
+                  {news.author.first_name} {news.author.last_name}
+                </span>
               </div>
               <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
-                <span>{new Date(news.published_at).toLocaleDateString('tr-TR')}</span>
+                <Calendar className="h-4 w-4" />
+                <span>
+                  {new Date(news.published_at).toLocaleDateString("tr-TR")}
+                </span>
               </div>
             </div>
           </CardHeader>
-          
-          <CardContent className="prose dark:prose-invert max-w-none">
-            <div 
-              dangerouslySetInnerHTML={{ 
-                __html: typeof news.content === 'string' 
-                  ? news.content 
-                  : news.content?.html || '' 
+
+          <CardContent className="prose max-w-none dark:prose-invert">
+            <div
+              dangerouslySetInnerHTML={{
+                __html:
+                  typeof news.content === "string"
+                    ? news.content
+                    : news.content?.html || "",
               }}
             />
           </CardContent>
         </Card>
 
-        {/* Comment System */}
         <CommentSystem articleId={news.id} />
       </div>
     </div>
-  )
+  );
 }
