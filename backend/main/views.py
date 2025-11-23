@@ -2152,3 +2152,16 @@ class DatabaseStatsView(APIView):
         except Exception as e:
             print(f"Error getting database stats: {e}")
             return Response({'error': f'Error getting database stats: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def public_categories_view(request):
+    """
+    Public kategori listesi (sadece aktifler)
+    Frontend: GET /api/categories/public
+    """
+    qs = Category.objects.filter(is_active=True).order_by('sort_order', 'name')
+    serializer = CategorySerializer(qs, many=True)
+    return Response(serializer.data)
+     
