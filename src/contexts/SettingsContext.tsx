@@ -55,7 +55,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setLoading(true)
       setError(null)
       
-      const response = await fetch('/api/settings/public')
+      const response = await fetch('/settings/public')
       const result = await response.json()
       
       if (result.success) {

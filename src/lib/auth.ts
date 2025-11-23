@@ -5,7 +5,6 @@ import type { JWT } from "next-auth/jwt";
 import GoogleProvider from "next-auth/providers/google";
 import DiscordProvider from "next-auth/providers/discord";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { DJANGO_API_URL } from "./api";
 
 /* ---------- Django login response tipleri ---------- */
 
@@ -47,7 +46,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
-          const url = `${DJANGO_API_URL}/auth/login/`;
+          const url = `/auth/login/`;
           console.log("🔐 [NextAuth] Login isteği:", url, credentials.email);
 
           const response = await fetch(url, {
