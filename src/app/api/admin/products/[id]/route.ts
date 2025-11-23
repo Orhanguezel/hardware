@@ -43,7 +43,7 @@ interface DjangoProduct {
   updated_at: string
 }
 
-// Küçük helper: session’dan user/role/token çekme
+// Session’dan user/role/token çekme helper
 function extractAuth(session: unknown): {
   userId?: string
   role?: Role
@@ -68,10 +68,12 @@ function isAdmin(role: Role | undefined): boolean {
   return role === 'ADMIN' || role === 'SUPER_ADMIN'
 }
 
-// Get single product
+/* =========================
+   GET /api/admin/products/[id]
+   ========================= */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -84,7 +86,7 @@ export async function GET(
       )
     }
 
-    const { id } = params
+    const { id } = await params
 
     const response = await fetch(`${djangoApiUrl}/products/id/${id}/`, {
       method: 'GET',
@@ -155,10 +157,12 @@ export async function GET(
   }
 }
 
-// Update product
+/* =========================
+   PUT /api/admin/products/[id]
+   ========================= */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -171,7 +175,7 @@ export async function PUT(
       )
     }
 
-    const { id } = params
+    const { id } = await params
     const formData = await request.formData()
 
     console.log(
@@ -267,10 +271,12 @@ export async function PUT(
   }
 }
 
-// Delete product
+/* =========================
+   DELETE /api/admin/products/[id]
+   ========================= */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -283,7 +289,7 @@ export async function DELETE(
       )
     }
 
-    const { id } = params
+    const { id } = await params
 
     const response = await fetch(`${djangoApiUrl}/products/id/${id}/`, {
       method: 'DELETE',
