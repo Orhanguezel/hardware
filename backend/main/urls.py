@@ -20,14 +20,9 @@ urlpatterns = [
     path('auth/check-verification-status/', views.check_email_verification_status_view, name='check-verification-status'),
     
     # Categories
-    # ÖNCE public endpoint (slug pattern'inden önce olmalı)
-    path('categories/public/', views.public_categories_view, name='category-public'),
-    # Sonra list
     path('categories/', views.CategoryListCreateView.as_view(), name='category-list'),
-    # ID üzerinden detay
-    path('categories/id/<int:pk>/', views.CategoryDetailView.as_view(), name='category-detail-by-id'),
-    # EN SON slug detail (public & id'yi yutmaması için)
     path('categories/<slug:slug>/', views.CategoryDetailView.as_view(), name='category-detail'),
+    path('categories/id/<int:pk>/', views.CategoryDetailView.as_view(), name='category-detail-by-id'),
     
     # Tags
     path('tags/', views.TagListCreateView.as_view(), name='tag-list'),
@@ -101,7 +96,7 @@ urlpatterns = [
     path('article-view/', views.track_article_view, name='article-view'),
     
     # Monthly Analytics
-    path('analytics/monthly/', views.monthly_analytics_view.as_view(), name='monthly-analytics'),
+    path('analytics/monthly/', views.monthly_analytics_view, name='monthly-analytics'),
     
     # Database Statistics
     path('database/stats/', views.DatabaseStatsView.as_view(), name='database-stats'),
@@ -116,9 +111,10 @@ urlpatterns = [
     path('auth/verify-reset-code/', password_reset_views.verify_reset_code_view, name='verify-reset-code'),
     path('auth/reset-password/', password_reset_views.reset_password_view, name='reset-password'),
 
-    # Test email
+        # Test email
     path('email/test/', email_test_views.test_email_view, name='email-test'),
 
+    
     # Include router URLs
     path('', include(router.urls)),
 ]
