@@ -8,10 +8,12 @@ import { DJANGO_API_URL } from '@/lib/api'
 // Env’den gelen base URL (sonundaki / işaretlerini temizleyelim)
 const djangoApiUrl = DJANGO_API_URL.replace(/\/+$/, '')
 
-interface RouteContext {
-  params: {
-    id: string
-  }
+type Role = 'ADMIN' | 'SUPER_ADMIN' | string
+
+interface DjangoCategory {
+  id: number
+  name: string
+  slug: string
 }
 
 interface DjangoAffiliateLink {
@@ -21,18 +23,61 @@ interface DjangoAffiliateLink {
   active: boolean
 }
 
+interface DjangoProduct {
+  id: number
+  brand: string
+  model: string
+  slug: string
+  description: string
+  price: number | null
+  release_year: number | null
+  cover_image: string | null
+  category: DjangoCategory | null
+  specs?: unknown[]
+  product_tags?: unknown[]
+  affiliate_links?: DjangoAffiliateLink[]
+  user_reviews?: unknown[]
+  average_rating?: number | null
+  review_count?: number
+  created_at: string
+  updated_at: string
+}
+
+// Küçük helper: session’dan user/role/token çekme
+function extractAuth(session: unknown): {
+  userId?: string
+  role?: Role
+  accessToken: string
+} {
+  const s = session as
+    | {
+        user?: { id?: string; role?: Role }
+        accessToken?: string
+      }
+    | null
+    | undefined
+
+  return {
+    userId: s?.user?.id,
+    role: s?.user?.role,
+    accessToken: s?.accessToken ?? '',
+  }
+}
+
+function isAdmin(role: Role | undefined): boolean {
+  return role === 'ADMIN' || role === 'SUPER_ADMIN'
+}
+
 // Get single product
-export async function GET(request: NextRequest, { params }: RouteContext) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } },
+) {
   try {
     const session = await getServerSession(authOptions)
+    const { userId, role, accessToken } = extractAuth(session)
 
-    const user = session?.user as { id?: string; role?: string } | undefined
-    const role = user?.role ?? ''
-    const accessToken =
-      (session as { accessToken?: string } | null | undefined)?.accessToken ??
-      ''
-
-    if (!user?.id || !['ADMIN', 'SUPER_ADMIN'].includes(role)) {
+    if (!userId || !isAdmin(role)) {
       return NextResponse.json(
         { success: false, error: 'Admin or Super Admin access required' },
         { status: 403 },
@@ -59,7 +104,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       throw new Error(`Django API error: ${response.status}`)
     }
 
-    const product = await response.json()
+    const product = (await response.json()) as DjangoProduct
 
     const transformedProduct = {
       id: product.id.toString(),
@@ -77,21 +122,19 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
             slug: product.category.slug,
           }
         : null,
-      productSpecs: product.specs || [],
-      product_tags: product.product_tags || [],
-      affiliateLinks: (product.affiliate_links || []).map(
-        (link: DjangoAffiliateLink) => ({
-          id: link.id,
-          merchant: link.merchant,
-          urlTemplate: link.url_template,
-          active: link.active,
-        }),
-      ),
-      userReviews: product.user_reviews || [],
+      productSpecs: product.specs ?? [],
+      product_tags: product.product_tags ?? [],
+      affiliateLinks: (product.affiliate_links ?? []).map((link) => ({
+        id: link.id,
+        merchant: link.merchant,
+        urlTemplate: link.url_template,
+        active: link.active,
+      })),
+      userReviews: product.user_reviews ?? [],
       averageRating: product.average_rating,
-      reviewCount: product.review_count || 0,
-      specsCount: product.specs?.length || 0,
-      affiliateLinksCount: product.affiliate_links?.length || 0,
+      reviewCount: product.review_count ?? 0,
+      specsCount: product.specs?.length ?? 0,
+      affiliateLinksCount: product.affiliate_links?.length ?? 0,
       createdAt: product.created_at,
       updatedAt: product.updated_at,
     }
@@ -113,17 +156,15 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
 }
 
 // Update product
-export async function PUT(request: NextRequest, { params }: RouteContext) {
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } },
+) {
   try {
     const session = await getServerSession(authOptions)
+    const { userId, role, accessToken } = extractAuth(session)
 
-    const user = session?.user as { id?: string; role?: string } | undefined
-    const role = user?.role ?? ''
-    const accessToken =
-      (session as { accessToken?: string } | null | undefined)?.accessToken ??
-      ''
-
-    if (!user?.id || !['ADMIN', 'SUPER_ADMIN'].includes(role)) {
+    if (!userId || !isAdmin(role)) {
       return NextResponse.json(
         { success: false, error: 'Admin or Super Admin access required' },
         { status: 403 },
@@ -176,7 +217,7 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
       )
     }
 
-    const updatedProduct = await response.json()
+    const updatedProduct = (await response.json()) as DjangoProduct
 
     const transformedProduct = {
       id: updatedProduct.id.toString(),
@@ -194,20 +235,18 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
             slug: updatedProduct.category.slug,
           }
         : null,
-      productSpecs: updatedProduct.specs || [],
-      product_tags: updatedProduct.product_tags || [],
-      affiliateLinks: (updatedProduct.affiliate_links || []).map(
-        (link: DjangoAffiliateLink) => ({
-          id: link.id,
-          merchant: link.merchant,
-          urlTemplate: link.url_template,
-          active: link.active,
-        }),
-      ),
+      productSpecs: updatedProduct.specs ?? [],
+      product_tags: updatedProduct.product_tags ?? [],
+      affiliateLinks: (updatedProduct.affiliate_links ?? []).map((link) => ({
+        id: link.id,
+        merchant: link.merchant,
+        urlTemplate: link.url_template,
+        active: link.active,
+      })),
       averageRating: updatedProduct.average_rating,
-      reviewCount: updatedProduct.review_count || 0,
-      specsCount: updatedProduct.specs?.length || 0,
-      affiliateLinksCount: updatedProduct.affiliate_links?.length || 0,
+      reviewCount: updatedProduct.review_count ?? 0,
+      specsCount: updatedProduct.specs?.length ?? 0,
+      affiliateLinksCount: updatedProduct.affiliate_links?.length ?? 0,
       createdAt: updatedProduct.created_at,
       updatedAt: updatedProduct.updated_at,
     }
@@ -231,18 +270,13 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
 // Delete product
 export async function DELETE(
   request: NextRequest,
-  { params }: RouteContext,
+  { params }: { params: { id: string } },
 ) {
   try {
     const session = await getServerSession(authOptions)
+    const { userId, role, accessToken } = extractAuth(session)
 
-    const user = session?.user as { id?: string; role?: string } | undefined
-    const role = user?.role ?? ''
-    const accessToken =
-      (session as { accessToken?: string } | null | undefined)?.accessToken ??
-      ''
-
-    if (!user?.id || !['ADMIN', 'SUPER_ADMIN'].includes(role)) {
+    if (!userId || !isAdmin(role)) {
       return NextResponse.json(
         { success: false, error: 'Admin or Super Admin access required' },
         { status: 403 },
