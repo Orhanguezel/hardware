@@ -7,7 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import Images from "next/image";
+import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Calendar, User, Newspaper } from "lucide-react";
 import Link from "next/link";
@@ -112,10 +112,10 @@ export async function generateStaticParams() {
     }
 
     const result = await response.json();
-    const news: NewsDetail[] = Array.isArray(result.results)
-      ? result.results
+    const news: NewsDetail[] = Array.isArray((result as any).results)
+      ? (result as any).results
       : Array.isArray(result)
-        ? result
+        ? (result as any)
         : [];
 
     return news.map((newsItem) => ({
@@ -128,13 +128,14 @@ export async function generateStaticParams() {
   }
 }
 
-// NOT: Burada params Promise DEĞİL, direkt object olmalı
+// Projedeki PageProps constraint'i params'ı Promise beklediği için
+// burada da Promise<{ slug: string }> kullanıyoruz.
 export default async function NewsPage({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
-  const { slug } = params;
+  const { slug } = await params;
   const news = await getNews(slug);
 
   if (!news || news.type !== "NEWS") {
@@ -152,79 +153,79 @@ export default async function NewsPage({
           <ArrowLeft className="mr-1 h-4 w-4" /> Tüm Haberler
         </Link>
 
-        <Card className="mb-8">
-          {news.hero_image && (
-            <div className="aspect-video overflow-hidden rounded-t-lg">
-              <Images
-                src={news.hero_image}
-                alt={news.title}
-                width={800}
-                height={450}
-                className="h-full w-full object-cover"
-              />
+      <Card className="mb-8">
+        {news.hero_image && (
+          <div className="aspect-video overflow-hidden rounded-t-lg">
+            <Image
+              src={news.hero_image}
+              alt={news.title}
+              width={800}
+              height={450}
+              className="h-full w-full object-cover"
+            />
+          </div>
+        )}
+
+        <CardHeader className="pb-4">
+          <div className="mb-4 flex items-center gap-2">
+            <Badge variant="secondary" className="w-fit">
+              {news.category?.name || "Genel"}
+            </Badge>
+            <Badge variant="outline">
+              <Newspaper className="mr-1 h-3 w-3" />
+              Haber
+            </Badge>
+          </div>
+
+          <CardTitle className="mb-2 text-4xl font-extrabold leading-tight">
+            {news.title}
+          </CardTitle>
+
+          {news.subtitle && (
+            <p className="mb-4 text-xl text-muted-foreground">
+              {news.subtitle}
+            </p>
+          )}
+
+          {news.article_tags && news.article_tags.length > 0 && (
+            <div className="mb-4 flex flex-wrap gap-2">
+              {news.article_tags.map((tag) => (
+                <Badge key={tag.id} variant="outline" className="text-sm">
+                  {tag.name}
+                </Badge>
+              ))}
             </div>
           )}
 
-          <CardHeader className="pb-4">
-            <div className="mb-4 flex items-center gap-2">
-              <Badge variant="secondary" className="w-fit">
-                {news.category?.name || "Genel"}
-              </Badge>
-              <Badge variant="outline">
-                <Newspaper className="mr-1 h-3 w-3" />
-                Haber
-              </Badge>
+          <div className="flex items-center gap-6 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4" />
+              <span>
+                {news.author.first_name} {news.author.last_name}
+              </span>
             </div>
-
-            <CardTitle className="mb-2 text-4xl font-extrabold leading-tight">
-              {news.title}
-            </CardTitle>
-
-            {news.subtitle && (
-              <p className="mb-4 text-xl text-muted-foreground">
-                {news.subtitle}
-              </p>
-            )}
-
-            {news.article_tags && news.article_tags.length > 0 && (
-              <div className="mb-4 flex flex-wrap gap-2">
-                {news.article_tags.map((tag) => (
-                  <Badge key={tag.id} variant="outline" className="text-sm">
-                    {tag.name}
-                  </Badge>
-                ))}
-              </div>
-            )}
-
-            <div className="flex items-center gap-6 text-sm text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <User className="h-4 w-4" />
-                <span>
-                  {news.author.first_name} {news.author.last_name}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                <span>
-                  {new Date(news.published_at).toLocaleDateString("tr-TR")}
-                </span>
-              </div>
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              <span>
+                {new Date(news.published_at).toLocaleDateString("tr-TR")}
+              </span>
             </div>
-          </CardHeader>
+          </div>
+        </CardHeader>
 
-          <CardContent className="prose max-w-none dark:prose-invert">
-            <div
-              dangerouslySetInnerHTML={{
-                __html:
-                  typeof news.content === "string"
-                    ? news.content
-                    : news.content?.html || "",
-              }}
-            />
-          </CardContent>
-        </Card>
+        <CardContent className="prose max-w-none dark:prose-invert">
+          <div
+            dangerouslySetInnerHTML={{
+              __html:
+                typeof news.content === "string"
+                  ? news.content
+                  : news.content?.html || "",
+            }}
+          />
+        </CardContent>
+      </Card>
 
-        <CommentSystem articleId={news.id} />
+      <CommentSystem articleId={news.id} />
       </div>
     </div>
   );
