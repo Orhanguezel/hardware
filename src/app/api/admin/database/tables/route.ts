@@ -6,7 +6,7 @@ import { DJANGO_API_URL } from '@/lib/api'
 export async function GET() {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user?.id || !['ADMIN', 'SUPER_ADMIN'].includes(session.user.role)) {
       return NextResponse.json(
         { success: false, error: 'Admin or Super Admin access required' },
@@ -17,7 +17,7 @@ export async function GET() {
     // Django API'den database istatistiklerini al
     const response = await fetch(`${DJANGO_API_URL}/database/stats/`, {
       headers: {
-        'Authorization': `Token ${(session as any).accessToken || ''}`,
+        'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken || ''}`,
         'Content-Type': 'application/json',
       },
     })
@@ -29,7 +29,7 @@ export async function GET() {
     }
 
     const data = await response.json()
-    
+
     if (!data.success) {
       throw new Error(data.error || 'Failed to fetch database stats')
     }

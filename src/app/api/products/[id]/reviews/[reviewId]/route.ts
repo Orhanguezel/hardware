@@ -20,7 +20,7 @@ export async function GET(
 
     // Check if id is a number or slug
     const isNumeric = /^\d+$/.test(id)
-    
+
     let apiUrl: string
     if (isNumeric) {
       // If it's a number, treat it as ID
@@ -79,7 +79,7 @@ export async function PUT(
 
     // Check if id is a number or slug
     const isNumeric = /^\d+$/.test(id)
-    
+
     let apiUrl: string
     if (isNumeric) {
       // If it's a number, treat it as ID
@@ -93,7 +93,7 @@ export async function PUT(
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Token ${(session as any).accessToken || ''}`,
+        'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken || ''}`,
       },
       body: JSON.stringify(body),
     })
@@ -139,7 +139,7 @@ export async function DELETE(
 
     // Check if id is a number or slug
     const isNumeric = /^\d+$/.test(id)
-    
+
     let apiUrl: string
     if (isNumeric) {
       // If it's a number, treat it as ID
@@ -152,7 +152,7 @@ export async function DELETE(
     const response = await fetch(apiUrl, {
       method: 'DELETE',
       headers: {
-        'Authorization': `Token ${(session as any).accessToken || ''}`,
+        'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken || ''}`,
       },
     })
 

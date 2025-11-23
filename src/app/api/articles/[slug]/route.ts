@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { DJANGO_API_URL } from "@/lib/api";
 
 export async function GET(
   request: NextRequest,
@@ -6,9 +7,12 @@ export async function GET(
 ) {
   try {
     const { slug } = await params
-    const djangoApiUrl = 'http://localhost:8000/api'
+
+
+    // Env’den gelen base URL (sonundaki / işaretlerini temizleyelim)
+    const djangoApiUrl = DJANGO_API_URL.replace(/\/+$/, "");
     const url = `${djangoApiUrl}/articles/${slug}/`
-    
+
     console.log('Django API URL:', djangoApiUrl)
     console.log('Fetching article from Django API:', url)
 

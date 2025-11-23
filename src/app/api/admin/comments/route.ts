@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     const commentsResponse = await fetch(`${DJANGO_API_URL}/comments/?${djangoParams.toString()}`, {
       cache: 'no-store',
       headers: {
-        'Authorization': `Token ${(session as any).accessToken || ''}`,
+        'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken || ''}`,
         'Content-Type': 'application/json',
       }
     })

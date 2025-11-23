@@ -13,7 +13,7 @@ interface RouteParams {
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user?.id || !['ADMIN', 'SUPER_ADMIN', 'EDITOR'].includes(session.user.role)) {
       return NextResponse.json(
         { success: false, error: 'Admin, Super Admin, or Editor access required' },
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const response = await fetch(`${DJANGO_API_URL}/articles/id/${id}/`, {
       headers: {
-        'Authorization': `Token ${(session as any).accessToken}`,
+        'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken}`,
         'Content-Type': 'application/json',
       },
     })
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
       console.error('Django API error response:', response.status, errorData)
-      
+
       if (response.status === 404) {
         return NextResponse.json(
           { success: false, error: 'Article not found' },
@@ -66,7 +66,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user?.id || !['ADMIN', 'SUPER_ADMIN', 'EDITOR'].includes(session.user.role)) {
       return NextResponse.json(
         { success: false, error: 'Admin, Super Admin, or Editor access required' },
@@ -76,17 +76,17 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params
     const contentType = request.headers.get('content-type')
-    
+
     let response: Response
-    
+
     if (contentType?.includes('multipart/form-data')) {
       // Handle FormData for file uploads
       const formData = await request.formData()
       console.log('API Route - Received FormData:', Object.fromEntries(formData.entries()))
-      
+
       // Create FormData for Django
       const djangoFormData = new FormData()
-      
+
       // Add all form fields
       const fields = ['title', 'subtitle', 'excerpt', 'content', 'type', 'category_id', 'status', 'meta_title', 'meta_description']
       fields.forEach(field => {
@@ -95,7 +95,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
           djangoFormData.append(field, value as string)
         }
       })
-      
+
       // Generate slug from title
       const title = formData.get('title') as string
       if (title) {
@@ -107,18 +107,18 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
           .trim()
         djangoFormData.append('slug', slug)
       }
-      
+
       // Add tags
       const tags = formData.getAll('tags')
       console.log('Tags from FormData:', tags)
       // Always send tags field - empty string means remove all tags
       const tagsString = tags.length > 0 ? tags.join(',') : ''
       djangoFormData.append('tags', tagsString)
-      
+
       // Add hero image file or URL or handle removal
       const heroImageFile = formData.get('hero_image_file') as File
       const heroImageUrl = formData.get('hero_image') as string
-      
+
       if (heroImageFile && heroImageFile.size > 0) {
         // New file uploaded
         djangoFormData.append('hero_image_file', heroImageFile)
@@ -127,22 +127,22 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         djangoFormData.append('hero_image', heroImageUrl)
       }
       // If heroImageUrl is null, don't send hero_image field (keep existing)
-      
+
       response = await fetch(`${DJANGO_API_URL}/articles/id/${id}/`, {
         method: 'PUT',
         headers: {
-          'Authorization': `Token ${(session as any).accessToken}`,
+          'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken}`,
         },
         body: djangoFormData,
       })
     } else {
       // Handle JSON data
       const body = await request.json()
-      
+
       response = await fetch(`${DJANGO_API_URL}/articles/id/${id}/`, {
         method: 'PUT',
         headers: {
-          'Authorization': `Token ${(session as any).accessToken}`,
+          'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(body),
@@ -177,7 +177,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user?.id || !['ADMIN', 'SUPER_ADMIN', 'EDITOR'].includes(session.user.role)) {
       return NextResponse.json(
         { success: false, error: 'Admin, Super Admin, or Editor access required' },
@@ -199,7 +199,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const response = await fetch(`${DJANGO_API_URL}/articles/id/${id}/`, {
       method: 'PATCH',
       headers: {
-        'Authorization': `Token ${(session as any).accessToken}`,
+        'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ status }),
@@ -232,7 +232,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user?.id || !['ADMIN', 'SUPER_ADMIN', 'EDITOR'].includes(session.user.role)) {
       return NextResponse.json(
         { success: false, error: 'Admin, Super Admin, or Editor access required' },
@@ -245,7 +245,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     const response = await fetch(`${DJANGO_API_URL}/articles/id/${id}/`, {
       method: 'DELETE',
       headers: {
-        'Authorization': `Token ${(session as any).accessToken}`,
+        'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken}`,
         'Content-Type': 'application/json',
       },
     })

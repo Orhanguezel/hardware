@@ -28,7 +28,7 @@ export async function GET(
     // Check if id is a number or slug
     const isNumeric = /^\d+$/.test(id)
     console.log('Is numeric ID:', isNumeric)
-    
+
     let apiUrl: string
     if (isNumeric) {
       // If it's a number, treat it as ID
@@ -98,7 +98,7 @@ export async function POST(
 
     // Check if id is a number or slug
     const isNumeric = /^\d+$/.test(id)
-    
+
     let apiUrl: string
     if (isNumeric) {
       // If it's a number, treat it as ID
@@ -112,7 +112,7 @@ export async function POST(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Token ${(session as any).accessToken || ''}`,
+        'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken || ''}`,
       },
       body: JSON.stringify(body),
     })

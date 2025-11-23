@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user?.id || !['ADMIN', 'SUPER_ADMIN', 'EDITOR'].includes(session.user.role)) {
       return NextResponse.json(
         { success: false, error: 'Admin, Super Admin, or Editor access required' },
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
 
     const formData = await request.formData()
     console.log('API Route - Received FormData:', Object.fromEntries(formData.entries()))
-    
+
     // Extract data from FormData
     const title = formData.get('title') as string
     const subtitle = formData.get('subtitle') as string
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     const metaDescription = formData.get('metaDescription') as string
     const heroImageFile = formData.get('hero_image_file') as File
     const heroImageUrl = formData.get('heroImage') as string
-    
+
     // Generate slug from title
     const slug = title
       .toLowerCase()
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
     if (type === 'REVIEW') {
       const scores = formData.get('scores') as string
       const totalScore = formData.get('totalScore') as string
-      
+
       if (scores) {
         const scoresData = JSON.parse(scores)
         djangoData.review_extra_data = {
@@ -118,14 +118,14 @@ export async function POST(request: NextRequest) {
     // Add best list extra data if it's a best list article
     if (type === 'BEST_LIST') {
       const bestListItems = formData.get('bestListItems') as string
-      
+
       if (bestListItems) {
         const itemsData = JSON.parse(bestListItems)
-        
+
         // Process best list items to handle image files
         const processedItems = itemsData.map((item: any, index: number) => {
           const processedItem = { ...item }
-          
+
           // Check if there's a corresponding image file
           const imageFile = formData.get(`best_list_item_${index}_image_file`) as File
           if (imageFile && imageFile.size > 0) {
@@ -135,10 +135,10 @@ export async function POST(request: NextRequest) {
             delete processedItem.imageFile
             delete processedItem.imagePreview
           }
-          
+
           return processedItem
         })
-        
+
         djangoData.best_list_extra_data = {
           items: processedItems,
           criteria: {},
@@ -146,12 +146,12 @@ export async function POST(request: NextRequest) {
         }
       }
     }
-    
+
     console.log('Article data being sent to Django:', JSON.stringify(djangoData, null, 2))
-    
+
     // Create FormData for Django
     const djangoFormData = new FormData()
-    
+
     // Add all text fields
     Object.keys(djangoData).forEach(key => {
       if (key !== 'hero_image_file' && djangoData[key] !== null && djangoData[key] !== undefined) {
@@ -162,12 +162,12 @@ export async function POST(request: NextRequest) {
         }
       }
     })
-    
+
     // Add file if exists
     if (djangoData.hero_image_file) {
       djangoFormData.append('hero_image_file', djangoData.hero_image_file)
     }
-    
+
     // Add best list item image files if they exist
     if (type === 'BEST_LIST' && djangoData.best_list_extra_data?.items) {
       djangoData.best_list_extra_data.items.forEach((item: any, index: number) => {
@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
         }
       })
     }
-    
+
     // Add tags
     const tags = formData.getAll('tags')
     console.log('Tags received in API:', tags)
@@ -186,11 +186,11 @@ export async function POST(request: NextRequest) {
     if (tags.length > 0) {
       djangoFormData.append('tags', JSON.stringify(tags))
     }
-    
+
     const response = await fetch(`${DJANGO_API_URL}/articles/`, {
       method: 'POST',
       headers: {
-        'Authorization': `Token ${(session as any).accessToken}`,
+        'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken}`,
       },
       body: djangoFormData,
     })
