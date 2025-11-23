@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { DJANGO_API_URL } from "@/lib/api";
 
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user?.id || !['ADMIN', 'SUPER_ADMIN'].includes(session.user.role)) {
       return NextResponse.json(
         { success: false, error: 'Admin or Super Admin access required' },
@@ -13,8 +14,11 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const djangoApiUrl = 'http://localhost:8000/api'
-    
+
+
+    // Env’den gelen base URL (sonundaki / işaretlerini temizleyelim)
+    const djangoApiUrl = DJANGO_API_URL.replace(/\/+$/, "");
+
     // Get dashboard statistics from Django API
     const [
       articlesResponse,
@@ -26,37 +30,37 @@ export async function GET(request: NextRequest) {
     ] = await Promise.all([
       fetch(`${djangoApiUrl}/articles/`, {
         headers: {
-          'Authorization': `Token ${(session as any).accessToken}`,
+          'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken}`,
           'Content-Type': 'application/json',
         },
       }),
       fetch(`${djangoApiUrl}/comments/`, {
         headers: {
-          'Authorization': `Token ${(session as any).accessToken}`,
+          'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken}`,
           'Content-Type': 'application/json',
         },
       }),
       fetch(`${djangoApiUrl}/products/`, {
         headers: {
-          'Authorization': `Token ${(session as any).accessToken}`,
+          'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken}`,
           'Content-Type': 'application/json',
         },
       }),
       fetch(`${djangoApiUrl}/categories/`, {
         headers: {
-          'Authorization': `Token ${(session as any).accessToken}`,
+          'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken}`,
           'Content-Type': 'application/json',
         },
       }),
       fetch(`${djangoApiUrl}/reviews/`, {
         headers: {
-          'Authorization': `Token ${(session as any).accessToken}`,
+          'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken}`,
           'Content-Type': 'application/json',
         },
       }),
       fetch(`${djangoApiUrl}/users/`, {
         headers: {
-          'Authorization': `Token ${(session as any).accessToken}`,
+          'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken}`,
           'Content-Type': 'application/json',
         },
       })
@@ -121,11 +125,11 @@ export async function GET(request: NextRequest) {
       title: article.title,
       status: article.status,
       author: {
-        name: article.author?.first_name && article.author?.last_name 
+        name: article.author?.first_name && article.author?.last_name
           ? `${article.author.first_name} ${article.author.last_name}`
           : article.author?.first_name || article.author?.last_name
-          ? `${article.author.first_name || ''} ${article.author.last_name || ''}`.trim()
-          : article.author?.username || 'Anonim'
+            ? `${article.author.first_name || ''} ${article.author.last_name || ''}`.trim()
+            : article.author?.username || 'Anonim'
       },
       created_at: article.created_at,
       comment_count: article.comment_count || 0
@@ -174,7 +178,7 @@ export async function GET(request: NextRequest) {
     // Get monthly views and affiliate clicks from Django API
     const monthlyAnalyticsResponse = await fetch(`${djangoApiUrl}/analytics/monthly/?year=${currentYear}&month=${currentMonth}`, {
       headers: {
-        'Authorization': `Token ${(session as any).accessToken}`,
+        'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken}`,
         'Content-Type': 'application/json',
       },
     })

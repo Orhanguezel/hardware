@@ -8,7 +8,7 @@ const DJANGO_API_URL = process.env.DJANGO_API_URL || 'http://localhost:8000/api'
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user?.id || !['ADMIN', 'SUPER_ADMIN'].includes(session.user.role)) {
       return NextResponse.json(
         { success: false, error: 'Admin or Super Admin access required' },
@@ -33,11 +33,11 @@ export async function GET(request: NextRequest) {
     const reviewsResponse = await fetch(`${DJANGO_API_URL}/reviews/?${djangoParams.toString()}`, {
       cache: 'no-store',
       headers: {
-        'Authorization': `Token ${(session as any).accessToken || ''}`,
+        'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken || ''}`,
         'Content-Type': 'application/json',
       }
     })
-    
+
     if (!reviewsResponse.ok) {
       const errorText = await reviewsResponse.text()
       console.error('Django API error response:', errorText)
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
 
     const reviewsData = await reviewsResponse.json()
     const reviews = reviewsData.results || reviewsData
-    
+
     // Transform reviews to match our interface
     const transformedReviews = reviews.map((review: any) => ({
       id: review.id,

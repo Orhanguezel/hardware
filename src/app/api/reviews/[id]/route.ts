@@ -13,7 +13,7 @@ interface RouteParams {
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params
-    
+
     const response = await fetch(`${DJANGO_API_URL}/reviews/${id}/`, {
       method: 'GET',
       headers: {
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     const data = await response.json()
-    
+
     return NextResponse.json({
       success: true,
       data: data
@@ -51,7 +51,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user?.id) {
       return NextResponse.json(
         { success: false, error: 'Authentication required' },
@@ -102,7 +102,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
-      
+
       // Handle review not found error
       if (response.status === 404) {
         return NextResponse.json(
@@ -110,7 +110,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
           { status: 404 }
         )
       }
-      
+
       // Handle permission error
       if (response.status === 403) {
         return NextResponse.json(
@@ -118,7 +118,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
           { status: 403 }
         )
       }
-      
+
       throw new Error(`Django API error: ${response.status}`)
     }
 
@@ -142,7 +142,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user?.id) {
       return NextResponse.json(
         { success: false, error: 'Authentication required' },
@@ -161,7 +161,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     const response = await fetch(`${DJANGO_API_URL}/reviews/${id}/`, {
       method: 'DELETE',
       headers: {
-        'Authorization': `Token ${(session as any).accessToken}`,
+        'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken}`,
       },
     })
 
@@ -172,14 +172,14 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
           { status: 404 }
         )
       }
-      
+
       if (response.status === 403) {
         return NextResponse.json(
           { success: false, error: 'You can only delete your own reviews' },
           { status: 403 }
         )
       }
-      
+
       throw new Error(`Django API error: ${response.status}`)
     }
 

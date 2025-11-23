@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { DJANGO_API_URL } from "@/lib/api";
+
 
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user?.id || !['ADMIN', 'SUPER_ADMIN'].includes(session.user.role)) {
       return NextResponse.json(
         { success: false, error: 'Admin or Super Admin access required' },
@@ -13,8 +15,11 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const djangoApiUrl = 'http://localhost:8000/api'
     
+
+    // Env’den gelen base URL (sonundaki / işaretlerini temizleyelim)
+    const djangoApiUrl = DJANGO_API_URL.replace(/\/+$/, "");
+
     // Get analytics data from Django API
     const [
       articlesResponse,
@@ -27,51 +32,51 @@ export async function GET(request: NextRequest) {
     ] = await Promise.all([
       fetch(`${djangoApiUrl}/articles/?status=PUBLISHED`, {
         headers: {
-          'Authorization': `Token ${(session as any).accessToken}`,
+          'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken}`,
           'Content-Type': 'application/json',
         },
       }),
       fetch(`${djangoApiUrl}/products/`, {
         headers: {
-          'Authorization': `Token ${(session as any).accessToken}`,
+          'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken}`,
           'Content-Type': 'application/json',
         },
       }),
       fetch(`${djangoApiUrl}/users/`, {
         headers: {
-          'Authorization': `Token ${(session as any).accessToken}`,
+          'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken}`,
           'Content-Type': 'application/json',
         },
       }),
       fetch(`${djangoApiUrl}/reviews/?status=APPROVED`, {
         headers: {
-          'Authorization': `Token ${(session as any).accessToken}`,
+          'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken}`,
           'Content-Type': 'application/json',
         },
       }),
       fetch(`${djangoApiUrl}/comments/?status=APPROVED`, {
         headers: {
-          'Authorization': `Token ${(session as any).accessToken}`,
+          'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken}`,
           'Content-Type': 'application/json',
         },
       }),
       fetch(`${djangoApiUrl}/categories/`, {
         headers: {
-          'Authorization': `Token ${(session as any).accessToken}`,
+          'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken}`,
           'Content-Type': 'application/json',
         },
       }),
       fetch(`${djangoApiUrl}/affiliate-links/?active=true`, {
         headers: {
-          'Authorization': `Token ${(session as any).accessToken}`,
+          'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken}`,
           'Content-Type': 'application/json',
         },
       })
     ])
 
     // Check if all responses are OK
-    if (!articlesResponse.ok || !productsResponse.ok || !usersResponse.ok || 
-        !reviewsResponse.ok || !commentsResponse.ok || !categoriesResponse.ok || !affiliateLinksResponse.ok) {
+    if (!articlesResponse.ok || !productsResponse.ok || !usersResponse.ok ||
+      !reviewsResponse.ok || !commentsResponse.ok || !categoriesResponse.ok || !affiliateLinksResponse.ok) {
       console.error('Analytics API responses not OK:', {
         articles: articlesResponse.status,
         products: productsResponse.status,

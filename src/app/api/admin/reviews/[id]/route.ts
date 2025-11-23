@@ -14,7 +14,7 @@ interface RouteParams {
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user?.id || !['ADMIN', 'SUPER_ADMIN'].includes(session.user.role)) {
       return NextResponse.json(
         { success: false, error: 'Admin or Super Admin access required' },
@@ -37,7 +37,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Token ${(session as any).accessToken || ''}`,
+        'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken || ''}`,
       },
       body: JSON.stringify({ status }),
     })
@@ -68,7 +68,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user?.id || !['ADMIN', 'SUPER_ADMIN'].includes(session.user.role)) {
       return NextResponse.json(
         { success: false, error: 'Admin or Super Admin access required' },
@@ -82,7 +82,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Token ${(session as any).accessToken || ''}`,
+        'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken || ''}`,
       },
     })
 

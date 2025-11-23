@@ -9,10 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { 
-  MessageSquare, 
-  ThumbsUp, 
-  Reply, 
+import {
+  MessageSquare,
+  ThumbsUp,
+  Reply,
   User,
   Calendar,
   Send
@@ -38,10 +38,10 @@ interface CommentSystemProps {
   onHelpfulVote?: (commentId: number) => void
 }
 
-export default function CommentSystem({ 
-  articleId, 
+export default function CommentSystem({
+  articleId,
   articleTitle,
-  comments: initialComments = [], 
+  comments: initialComments = [],
   // onCommentSubmit, // şu an kullanılmıyor, lint hatasını önlemek için destructure’dan çıkarıldı
   onHelpfulVote
 }: CommentSystemProps) {
@@ -62,17 +62,17 @@ export default function CommentSystem({
   const getSortedComments = (comments: Comment[]) => {
     // Only show parent comments (not replies)
     const parentComments = comments.filter(c => c.status === 'APPROVED' && !c.parent)
-    
+
     switch (sortBy) {
       case 'oldest':
-        return [...parentComments].sort((a, b) => 
+        return [...parentComments].sort((a, b) =>
           new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
         )
       case 'helpful':
         return [...parentComments].sort((a, b) => b.helpful_count - a.helpful_count)
       case 'newest':
       default:
-        return [...parentComments].sort((a, b) => 
+        return [...parentComments].sort((a, b) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         )
     }
@@ -89,18 +89,18 @@ export default function CommentSystem({
       const response = await fetch(`/api/comments/${commentId}/helpful`, {
         method: 'POST',
         headers: {
-          'Authorization': `Token ${(session as any).accessToken}`,
+          'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken}`,
           'Content-Type': 'application/json',
         },
       })
 
       const data = await response.json()
-      
+
       if (data.success) {
         // Update the comment's helpful count
-        setComments(prevComments => 
-          prevComments.map(comment => 
-            comment.id === commentId 
+        setComments(prevComments =>
+          prevComments.map(comment =>
+            comment.id === commentId
               ? { ...comment, helpful_count: data.data.helpful_count }
               : comment
           )
@@ -119,7 +119,7 @@ export default function CommentSystem({
       setLoading(true)
       const response = await fetch(`/api/comments?article=${articleId}`)
       const data = await response.json()
-      
+
       if (data.success) {
         setComments(data.data || [])
       }
@@ -132,7 +132,7 @@ export default function CommentSystem({
 
   const handleSubmitComment = async () => {
     if (!newComment.trim() || !session) return
-    
+
     try {
       const response = await fetch('/api/comments', {
         method: 'POST',
@@ -150,7 +150,7 @@ export default function CommentSystem({
       })
 
       const result = await response.json()
-      
+
       if (result.success) {
         setNewComment('')
         // Refresh comments
@@ -167,17 +167,17 @@ export default function CommentSystem({
 
   const handleSubmitReply = async () => {
     if (!replyContent.trim() || !replyingTo) return
-    
+
     // If not logged in, ask for name and email
     if (!session) {
       const name = prompt('Adınızı girin:')
       const email = prompt('E-posta adresinizi girin:')
-      
+
       if (!name || !email) {
         alert('Ad ve e-posta bilgileri gereklidir')
         return
       }
-      
+
       try {
         const response = await fetch('/api/comments', {
           method: 'POST',
@@ -195,7 +195,7 @@ export default function CommentSystem({
         })
 
         const data = await response.json()
-        
+
         if (data.success) {
           setReplyContent('')
           setReplyingTo(null)
@@ -228,7 +228,7 @@ export default function CommentSystem({
         })
 
         const data = await response.json()
-        
+
         if (data.success) {
           setReplyContent('')
           setReplyingTo(null)
@@ -254,18 +254,18 @@ export default function CommentSystem({
     onHelpfulVote?: (commentId: number) => void
   }) => {
     const [showReplies, setShowReplies] = useState(false)
-    
+
     // Handle replies toggle with proper event handling
     const handleToggleReplies = (e: MouseEvent) => {
       e.stopPropagation()
       setShowReplies(!showReplies)
     }
-    
+
     // Don't render if this is a reply and we're not in reply mode
     if (comment.parent && !isReply) {
       return null
     }
-    
+
     return (
       <div className={`${isReply ? 'ml-8 border-l-2 border-muted pl-4' : ''}`}>
         <Card className="mb-4">
@@ -287,7 +287,7 @@ export default function CommentSystem({
                     </div>
                   </div>
                 </div>
-                
+
                 {comment.status === 'PENDING' && (
                   <Badge variant="secondary">Bekliyor</Badge>
                 )}
@@ -312,7 +312,7 @@ export default function CommentSystem({
                   <ThumbsUp className="w-4 h-4 mr-1" />
                   Faydalı ({comment.helpful_count})
                 </Button>
-                
+
                 {!isReply && (
                   <Button
                     variant="ghost"
@@ -340,8 +340,8 @@ export default function CommentSystem({
                       rows={3}
                     />
                     <div className="flex gap-2">
-                      <Button 
-                        size="sm" 
+                      <Button
+                        size="sm"
                         onClick={(e) => {
                           e.stopPropagation()
                           handleSubmitReply()
@@ -350,9 +350,9 @@ export default function CommentSystem({
                         <Send className="w-4 h-4 mr-2" />
                         Yanıtla
                       </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
+                      <Button
+                        size="sm"
+                        variant="outline"
                         onClick={(e) => {
                           e.stopPropagation()
                           setReplyingTo(null)
@@ -377,7 +377,7 @@ export default function CommentSystem({
                   >
                     {showReplies ? 'Yanıtları Gizle' : `${comment.replies.length} Yanıtı Görüntüle`}
                   </Button>
-                  
+
                   {showReplies && (
                     <div className="mt-4 space-y-4">
                       {comment.replies.map((reply) => (
@@ -458,7 +458,7 @@ export default function CommentSystem({
             {articleTitle ? `${articleTitle} için Yorumlar` : 'Yorumlar'} ({approvedTopLevelCount})
           </h3>
           <div className="flex gap-2">
-            <select 
+            <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest' | 'helpful')}
               className="px-3 py-2 border rounded-md bg-background text-sm"

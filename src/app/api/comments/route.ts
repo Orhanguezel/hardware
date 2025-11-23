@@ -18,11 +18,11 @@ export async function GET(request: NextRequest) {
     const queryParams = new URLSearchParams()
     queryParams.append('page', page.toString())
     queryParams.append('limit', limit.toString())
-    
+
     if (status) queryParams.append('status', status)
     if (article) queryParams.append('article', article)
     if (search) queryParams.append('search', search)
-    
+
     const ordering = sortOrder === 'desc' ? `-${sortBy}` : sortBy
     queryParams.append('ordering', ordering)
 
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user?.id) {
       return NextResponse.json(
         { success: false, error: 'Authentication required' },
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    
+
     // Transform frontend data to Django format
     const djangoData = {
       content: body.content,
@@ -73,14 +73,14 @@ export async function POST(request: NextRequest) {
       ip_address: body.ipAddress || '127.0.0.1',
       status: 'PENDING' // Default status for new comments
     }
-    
+
     console.log('Comment data being sent to Django:', JSON.stringify(djangoData, null, 2))
-    
+
     const response = await fetch(`${DJANGO_API_URL}/comments/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Token ${(session as any).accessToken}`,
+        'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken}`,
       },
       body: JSON.stringify(djangoData),
     })

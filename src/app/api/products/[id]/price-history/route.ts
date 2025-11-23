@@ -22,7 +22,7 @@ export async function GET(
 
     // Check if id is a number or slug
     const isNumeric = /^\d+$/.test(id)
-    
+
     let apiUrl: string
     if (isNumeric) {
       // If it's a number, treat it as ID
@@ -31,7 +31,7 @@ export async function GET(
       // If it's not a number, treat it as slug
       apiUrl = `${DJANGO_API_URL}/products/slug/${id}/price-history/?page=${page}&limit=${limit}`
     }
-    
+
     const response = await fetch(apiUrl, {
       method: 'GET',
       headers: {
@@ -90,7 +90,7 @@ export async function POST(
 
     // Check if id is a number or slug
     const isNumeric = /^\d+$/.test(id)
-    
+
     let apiUrl: string
     if (isNumeric) {
       // If it's a number, treat it as ID
@@ -99,12 +99,12 @@ export async function POST(
       // If it's not a number, treat it as slug
       apiUrl = `${DJANGO_API_URL}/products/slug/${id}/price-history/`
     }
-    
+
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Token ${(session as any).accessToken || ''}`,
+        'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken || ''}`,
       },
       body: JSON.stringify(body),
     })

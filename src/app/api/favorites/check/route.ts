@@ -9,7 +9,7 @@ import { DJANGO_API_URL } from '@/lib/api'
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user?.id) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Token ${(session as any).accessToken || ''}`,
+        'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken || ''}`,
       },
     })
 
@@ -57,8 +57,8 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error checking favorite status:', error)
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'Failed to check favorite status'
       },
       { status: 500 }

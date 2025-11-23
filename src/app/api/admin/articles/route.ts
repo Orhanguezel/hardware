@@ -6,7 +6,7 @@ import { DJANGO_API_URL } from '@/lib/api'
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user?.id || !['ADMIN', 'SUPER_ADMIN', 'EDITOR'].includes(session.user.role)) {
       return NextResponse.json(
         { success: false, error: 'Admin, Super Admin, or Editor access required' },
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     const queryParams = new URLSearchParams()
     queryParams.append('page', page.toString())
     queryParams.append('limit', limit.toString())
-    
+
     if (search) {
       queryParams.append('search', search)
     }
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     // Get articles from Django API
     const response = await fetch(`${DJANGO_API_URL}/articles/?${queryParams.toString()}`, {
       headers: {
-        'Authorization': `Token ${(session as any).accessToken}`,
+        'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken}`,
         'Content-Type': 'application/json',
       },
     })
@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user?.id || !['ADMIN', 'SUPER_ADMIN', 'EDITOR'].includes(session.user.role)) {
       return NextResponse.json(
         { success: false, error: 'Admin, Super Admin, or Editor access required' },
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
     const response = await fetch(`${DJANGO_API_URL}/articles/`, {
       method: 'POST',
       headers: {
-        'Authorization': `Token ${(session as any).accessToken}`,
+        'Authorization': `Token ${(session as unknown as { accessToken: string }).accessToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
