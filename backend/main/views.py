@@ -1,8 +1,12 @@
+# hardware/backend/main/views.py
+
+import json
 from rest_framework import generics, status, permissions, serializers
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
+from rest_framework import permissions, status
 from rest_framework.response import Response
-from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
+from rest_framework.views import APIView
 from rest_framework.pagination import PageNumberPagination
 from django.contrib.auth import authenticate, login, logout
 from django.db.models import Q, Count, Avg
@@ -12,39 +16,126 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from .models import *
 from .serializers import *
-from .models_extra import PriceHistory, NewsletterSubscription
+from .models_extra import (
+    PriceHistory,
+    NewsletterSubscription,
+    ArticleTag,
+    ReviewExtra,
+    BestListExtra,
+)
 from .filters import *
 from .email_utils import send_verification_email, is_verification_token_valid, verify_user_email
 
+def parse_tags(raw):
+    """
+    Frontend'den gelen tags input'unu integer id listesine çevirir.
+    Örn:
+      - "1,2,3"
+      - "[1,2,3]"
+      - ["1","2"]
+      - [1, 2]
+    hepsini [1,2,3] şeklinde döndürür.
+    """
+    if raw is None:
+        return []
+
+    # Örn. JSON string ya da comma-separated string
+    if isinstance(raw, str):
+        raw = raw.strip()
+        if not raw:
+            return []
+
+        # Önce JSON array mi diye deneyelim
+        try:
+            data = json.loads(raw)
+            if isinstance(data, list):
+                result = []
+                for x in data:
+                    s = str(x).strip()
+                    if not s:
+                        continue
+                    try:
+                        result.append(int(s))
+                    except ValueError:
+                        continue
+                return result
+        except Exception:
+            # JSON değilse; "1,2,3" gibi düşün
+            parts = [p.strip() for p in raw.split(",") if p.strip()]
+            result = []
+            for p in parts:
+                try:
+                    result.append(int(p))
+                except ValueError:
+                    continue
+            return result
+
+    # Liste / tuple ise
+    if isinstance(raw, (list, tuple)):
+        result = []
+        for x in raw:
+            s = str(x).strip()
+            if not s:
+                continue
+            try:
+                result.append(int(s))
+            except ValueError:
+                continue
+        return result
+
+    # Diğer tipler için string'e çevirip tekrar dene
+    try:
+        return parse_tags(str(raw))
+    except Exception:
+        return []
+
+
 
 # Authentication Views
+
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
+@authentication_classes([])  # 🔴 Burada global auth'u override ediyoruz
 def login_view(request):
     serializer = LoginSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.validated_data['user']
-        
-        # Email doğrulama kontrolü
-        if not user.email_verified:
-            return Response({
-                'success': False,
-                'error': 'E-posta adresiniz doğrulanmamış. Lütfen e-posta kutunuzu kontrol edin ve doğrulama linkine tıklayın.',
-                'email_verification_required': True,
-                'email': user.email
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        token, created = Token.objects.get_or_create(user=user)
-        return Response({
-            'success': True,
-            'token': token.key,
-            'user': UserSerializer(user).data
-        })
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+        # Email doğrulama kontrolü
+        if not getattr(user, "email_verified", False):
+            return Response(
+                {
+                    "success": False,
+                    "error": "E-posta adresiniz doğrulanmamış. Lütfen e-posta kutunuzu kontrol edin ve doğrulama linkine tıklayın.",
+                    "email_verification_required": True,
+                    "email": user.email,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        token, _ = Token.objects.get_or_create(user=user)
+        return Response(
+            {
+                "success": True,
+                "token": token.key,
+                "user": UserSerializer(user).data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    # Geçersiz credential ya da serializer error
+    return Response(
+        {
+            "success": False,
+            "error": "Geçersiz giriş bilgileri.",
+            "detail": serializer.errors,
+        },
+        status=status.HTTP_400_BAD_REQUEST,
+    )
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
+@authentication_classes([])  # 🔴 Burada global auth'u override ediyoruz
 def register_view(request):
     serializer = RegisterSerializer(data=request.data)
     if serializer.is_valid():
@@ -293,159 +384,176 @@ class ProductDetailByIdView(generics.RetrieveUpdateDestroyAPIView):
             print(f"ProductDetailByIdView UPDATE - Error: {str(e)}")
             raise
 
-
-# Article Views
 class ArticleListCreateView(generics.ListCreateAPIView):
-    queryset = Article.objects.filter(status='PUBLISHED')
+    queryset = Article.objects.filter(status="PUBLISHED")
     serializer_class = ArticleSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = ArticleFilter
-    search_fields = ['title', 'subtitle', 'excerpt', 'content']
-    ordering_fields = ['title', 'published_at', 'created_at']
-    ordering = ['-published_at', '-created_at']
+    search_fields = ["title", "subtitle", "excerpt", "content"]
+    ordering_fields = ["title", "published_at", "created_at"]
+    ordering = ["-published_at", "-created_at"]
 
     def get_queryset(self):
         queryset = super().get_queryset()
         # Admin, super admin and editors can see all articles
-        if self.request.user.is_authenticated and self.request.user.role in ['ADMIN', 'SUPER_ADMIN', 'EDITOR']:
+        user = self.request.user
+        if user.is_authenticated and getattr(user, "role", None) in [
+            "ADMIN",
+            "SUPER_ADMIN",
+            "EDITOR",
+        ]:
             queryset = Article.objects.all()
         return queryset
 
     def perform_create(self, serializer):
         # Automatically set the author to the current user
         article = serializer.save(author=self.request.user)
-        
-        # Create article tags if tags are provided
-        print(f"All serializer initial_data keys: {list(serializer.initial_data.keys())}")
+
+        # --- DEBUG LOGS (isteğe bağlı) ---
+        print(
+            f"All serializer initial_data keys: {list(serializer.initial_data.keys())}"
+        )
         print(f"Tags in initial_data: {'tags' in serializer.initial_data}")
-        if 'tags' in serializer.initial_data:
-            print(f"Tags data: {serializer.initial_data['tags']}")
-        
-        if 'tags' in serializer.initial_data and serializer.initial_data['tags']:
-            from .models_extra import ArticleTag
-            import json
-            tags_data = serializer.initial_data['tags']
-            print(f"Tags data received in Django: {tags_data}")
-            
-            # Parse JSON string if it's a JSON array
-            if isinstance(tags_data, str):
-                try:
-                    tags_data = json.loads(tags_data)
-                except json.JSONDecodeError:
-                    # If not JSON, treat as single tag
-                    tags_data = [tags_data]
-            
-            # Ensure it's a list
-            if not isinstance(tags_data, list):
-                tags_data = [tags_data]
-            
-            print(f"Processed tags data: {tags_data}")
+        if "tags" in serializer.initial_data:
+            print(f"Raw tags data: {serializer.initial_data['tags']}")
+
+        # ---------- TAGS ----------
+        raw_tags = serializer.initial_data.get("tags")
+        tags_data = parse_tags(raw_tags)
+        print(f"Parsed tags_data: {tags_data}")
+
+        if tags_data:
+            created_count = 0
             for tag_id in tags_data:
                 try:
                     tag = Tag.objects.get(id=int(tag_id))
                     ArticleTag.objects.create(article=article, tag=tag)
+                    created_count += 1
                     print(f"Created tag: {tag.name} (ID: {tag_id})")
                 except (Tag.DoesNotExist, ValueError) as e:
-                    print(f"Tag with id {tag_id} not found: {e}")
-        
-        # Create review extra data if it's a review article
-        if article.type == 'REVIEW' and 'review_extra_data' in serializer.initial_data:
-            review_extra_data = serializer.initial_data['review_extra_data']
-            # Parse JSON string if it's a string
+                    print(f"Tag with id {tag_id} not found or invalid: {e}")
+            print(f"Total created tags: {created_count}")
+
+        # ---------- REVIEW EXTRA ----------
+        if (
+            article.type == "REVIEW"
+            and "review_extra_data" in serializer.initial_data
+        ):
+            review_extra_data = serializer.initial_data["review_extra_data"]
+
             if isinstance(review_extra_data, str):
-                import json
-                review_extra_data = json.loads(review_extra_data)
-            
+                try:
+                    review_extra_data = json.loads(review_extra_data)
+                except json.JSONDecodeError:
+                    print("Invalid review_extra_data JSON, skipping.")
+                    review_extra_data = {}
+
+            if not isinstance(review_extra_data, dict):
+                review_extra_data = {}
+
             ReviewExtra.objects.create(
                 article=article,
-                criteria=review_extra_data.get('criteria', ''),
-                pros=review_extra_data.get('pros', ''),
-                cons=review_extra_data.get('cons', ''),
-                technical_spec=review_extra_data.get('technical_spec', ''),
-                performance_score=review_extra_data.get('performance_score', 0),
-                stability_score=review_extra_data.get('stability_score', 0),
-                coverage_score=review_extra_data.get('coverage_score', 0),
-                software_score=review_extra_data.get('software_score', 0),
-                value_score=review_extra_data.get('value_score', 0),
-                total_score=review_extra_data.get('total_score', 0),
-                score_numeric=review_extra_data.get('score_numeric', 0)
+                criteria=review_extra_data.get("criteria", {}),
+                pros=review_extra_data.get("pros", []),
+                cons=review_extra_data.get("cons", []),
+                technical_spec=review_extra_data.get("technical_spec", {}),
+                performance_score=review_extra_data.get(
+                    "performance_score", 0
+                ),
+                stability_score=review_extra_data.get("stability_score", 0),
+                coverage_score=review_extra_data.get("coverage_score", 0),
+                software_score=review_extra_data.get("software_score", 0),
+                value_score=review_extra_data.get("value_score", 0),
+                total_score=review_extra_data.get("total_score", 0),
+                score_numeric=review_extra_data.get("score_numeric", 0),
             )
-        
-        # Create best list extra data if it's a best list article
-        if article.type == 'BEST_LIST' and 'best_list_extra_data' in serializer.initial_data:
-            best_list_extra_data = serializer.initial_data['best_list_extra_data']
-            # Parse JSON string if it's a string
+
+        # ---------- BEST LIST EXTRA ----------
+        if (
+            article.type == "BEST_LIST"
+            and "best_list_extra_data" in serializer.initial_data
+        ):
+            best_list_extra_data = serializer.initial_data[
+                "best_list_extra_data"
+            ]
+
             if isinstance(best_list_extra_data, str):
-                import json
-                best_list_extra_data = json.loads(best_list_extra_data)
-            
-            # Process best list items to handle image files
-            items = best_list_extra_data.get('items', [])
+                try:
+                    best_list_extra_data = json.loads(best_list_extra_data)
+                except json.JSONDecodeError:
+                    print("Invalid best_list_extra_data JSON, skipping.")
+                    best_list_extra_data = {}
+
+            if not isinstance(best_list_extra_data, dict):
+                best_list_extra_data = {}
+
+            items = best_list_extra_data.get("items", []) or []
             processed_items = []
-            
-            # Process best list items to handle image files
+
             for index, item in enumerate(items):
-                processed_item = item.copy()
-                
-                # Check if there's a corresponding image file
-                image_file_key = f'best_list_item_{index}_image_file'
+                processed_item = dict(item) if isinstance(item, dict) else {}
+                image_file_key = f"best_list_item_{index}_image_file"
+
                 if image_file_key in serializer.initial_data:
                     image_file = serializer.initial_data[image_file_key]
-                    if image_file and hasattr(image_file, 'size') and image_file.size > 0:
-                        # Upload the image file and get the URL
+                    if (
+                        image_file
+                        and hasattr(image_file, "size")
+                        and image_file.size > 0
+                    ):
                         from django.core.files.storage import default_storage
                         from django.core.files.base import ContentFile
                         import os
                         import uuid
-                        
-                        # Generate unique filename
+
                         file_extension = os.path.splitext(image_file.name)[1]
-                        unique_filename = f"best_list_items/{uuid.uuid4()}{file_extension}"
-                        
-                        # Save the file
-                        file_path = default_storage.save(unique_filename, ContentFile(image_file.read()))
+                        unique_filename = (
+                            f"best_list_items/{uuid.uuid4()}{file_extension}"
+                        )
+
+                        file_path = default_storage.save(
+                            unique_filename, ContentFile(image_file.read())
+                        )
                         image_url = default_storage.url(file_path)
-                        
-                        # Ensure the URL is absolute for frontend consumption
-                        from django.conf import settings
-                        if not image_url.startswith('http'):
-                            # Construct full URL for frontend
-                            base_url = "http://localhost:8000"  # Django server URL
+
+                        if not image_url.startswith("http"):
+                            base_url = "http://localhost:8000"
                             image_url = f"{base_url}{image_url}"
-                        
-                        # Update the item with the file URL
-                        processed_item['image'] = image_url
-                
+
+                        processed_item["image"] = image_url
+
                 processed_items.append(processed_item)
-            
+
             BestListExtra.objects.create(
                 article=article,
                 items=processed_items,
-                criteria=best_list_extra_data.get('criteria', {}),
-                methodology=best_list_extra_data.get('methodology', '')
+                criteria=best_list_extra_data.get("criteria", {}),
+                methodology=best_list_extra_data.get("methodology", ""),
             )
+
 
 
 class ArticleDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Article.objects.all()
     serializer_class = ArticleSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
-    lookup_field = 'slug'
+    lookup_field = "slug"
 
     def retrieve(self, request, *args, **kwargs):
         response = super().retrieve(request, *args, **kwargs)
-        
-        # Debug logging for meta data
-        if hasattr(response, 'data') and response.data:
+
+        if hasattr(response, "data") and response.data:
             article_data = response.data
-            print(f"=== ARTICLE DETAIL VIEW DEBUG ===")
+            print("=== ARTICLE DETAIL VIEW DEBUG ===")
             print(f"Article ID: {article_data.get('id')}")
             print(f"Article Title: {article_data.get('title')}")
             print(f"Meta Title: {article_data.get('meta_title', 'Not set')}")
-            print(f"Meta Description: {article_data.get('meta_description', 'Not set')}")
-            print(f"=================================")
-        
+            print(
+                f"Meta Description: {article_data.get('meta_description', 'Not set')}"
+            )
+            print("=================================")
+
         return response
 
 
@@ -453,43 +561,31 @@ class ArticleDetailByIdView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Article.objects.all()
     serializer_class = ArticleSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
-    lookup_field = 'pk'  # Use primary key instead of slug
+    lookup_field = "pk"  # Use primary key instead of slug
 
     def perform_update(self, serializer):
         article = serializer.save()
-        
-        # Log the update for debugging
+
         print(f"Article {article.id} updated. New status: {article.status}")
         print(f"Update data: {serializer.initial_data}")
-        
-        # Update article tags if tags are provided
-        if 'tags' in serializer.initial_data:
-            from .models_extra import ArticleTag
-            tags_data = serializer.initial_data['tags']
-            print(f"Tags data received in Django update: {tags_data}")
-            print(f"Tags data type: {type(tags_data)}")
-            
-            # Handle Django FormData - tags come as string with comma separation
-            if isinstance(tags_data, str):
-                # Split by comma and clean up - empty string means remove all tags
-                if tags_data.strip() == '':
-                    tags_data = []
-                else:
-                    tags_data = [tag.strip() for tag in tags_data.split(',') if tag.strip()]
-            elif not isinstance(tags_data, list):
-                tags_data = list(tags_data)
-            
-            print(f"Processed tags_data: {tags_data}")
-            
-            # Always update tags - empty list means remove all tags
-            # Delete existing tags
+
+        # ---------- TAGS UPDATE ----------
+        if "tags" in serializer.initial_data:
+            raw_tags = serializer.initial_data["tags"]
+            tags_data = parse_tags(raw_tags)
+            print(f"Parsed tags_data in update: {tags_data}")
+
+            # Eski bütün tag’leri sil
             ArticleTag.objects.filter(article=article).delete()
-            
+
             if tags_data:
-                # Filter out empty strings and create tags
-                valid_tags = [tag_id for tag_id in tags_data if tag_id and str(tag_id).strip()]
+                valid_tags = [
+                    tag_id
+                    for tag_id in tags_data
+                    if tag_id and str(tag_id).strip()
+                ]
                 print(f"Valid tags after filtering: {valid_tags}")
-                
+
                 for tag_id in valid_tags:
                     try:
                         tag = Tag.objects.get(id=int(tag_id))
@@ -499,12 +595,21 @@ class ArticleDetailByIdView(generics.RetrieveUpdateDestroyAPIView):
                         print(f"Tag with id {tag_id} not found: {e}")
             else:
                 print("No tags provided, all tags removed")
+        else:
+            print("No 'tags' field in update; tags unchanged")
 
     def perform_destroy(self, instance):
-        # Only admin, super admin, or editor can delete articles
-        if not hasattr(self.request.user, 'role') or self.request.user.role not in ['ADMIN', 'SUPER_ADMIN', 'EDITOR']:
-            raise permissions.PermissionDenied("Admin, Super Admin, or Editor access required to delete articles")
+        user = self.request.user
+        if not hasattr(user, "role") or user.role not in [
+            "ADMIN",
+            "SUPER_ADMIN",
+            "EDITOR",
+        ]:
+            raise permissions.PermissionDenied(
+                "Admin, Super Admin, or Editor access required to delete articles"
+            )
         instance.delete()
+
 
 
 # Comment Views
@@ -718,36 +823,137 @@ def search_view(request):
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def analytics_view(request):
-    if request.user.role not in ['ADMIN', 'EDITOR']:
-        return Response({'success': False, 'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+    role = getattr(request.user, "role", None)
+    if role not in ["ADMIN", "SUPER_ADMIN", "EDITOR"]:
+        return Response(
+            {"success": False, "error": "Permission denied"},
+            status=status.HTTP_403_FORBIDDEN,
+        )
 
-    # Basic analytics
+    from django.db.models import Count
+
+    # ---- Overview sayıları ----
     total_articles = Article.objects.count()
-    published_articles = Article.objects.filter(status='PUBLISHED').count()
     total_products = Product.objects.count()
     total_users = User.objects.count()
-    total_comments = Comment.objects.count()
-    approved_comments = Comment.objects.filter(status='APPROVED').count()
+    total_reviews = UserReview.objects.count()
+    total_affiliate_links = AffiliateLink.objects.count()
+    total_comments = Comment.objects.filter(status="APPROVED").count()
 
-    # Recent activity
-    recent_articles = Article.objects.order_by('-created_at')[:5]
-    recent_products = Product.objects.order_by('-created_at')[:5]
+    published_articles = Article.objects.filter(status="PUBLISHED").count()
 
-    return Response({
-        'success': True,
-        'data': {
-            'overview': {
-                'total_articles': total_articles,
-                'published_articles': published_articles,
-                'total_products': total_products,
-                'total_users': total_users,
-                'total_comments': total_comments,
-                'approved_comments': approved_comments,
-            },
-            'recent_articles': ArticleSerializer(recent_articles, many=True).data,
-            'recent_products': ProductSerializer(recent_products, many=True).data,
-        }
-    })
+    avg_reviews_per_product = (
+        round(total_reviews / total_products, 2) if total_products > 0 else 0
+    )
+    avg_comments_per_article = (
+        round(total_comments / published_articles, 2) if published_articles > 0 else 0
+    )
+
+    # ---- Son makaleler ----
+    recent_articles_qs = (
+        Article.objects.select_related("author")
+        .order_by("-created_at")[:5]
+    )
+
+    recent_articles = []
+    for a in recent_articles_qs:
+        comments_count = Comment.objects.filter(
+            article=a, status="APPROVED"
+        ).count()
+        recent_articles.append(
+            {
+                "id": a.id,
+                "title": a.title,
+                "author": (
+                    a.author.get_full_name()
+                    if getattr(a, "author", None)
+                    else ""
+                ),
+                "createdAt": a.created_at.isoformat() if a.created_at else "",
+                "commentsCount": comments_count,
+            }
+        )
+
+    # ---- Son ürünler ----
+    recent_products_qs = (
+        Product.objects.select_related("category")
+        .order_by("-created_at")[:5]
+    )
+
+    recent_products = []
+    for p in recent_products_qs:
+        reviews_count = UserReview.objects.filter(
+            product=p, status="APPROVED"
+        ).count()
+        affiliate_links_count = AffiliateLink.objects.filter(
+            product=p, active=True
+        ).count()
+        recent_products.append(
+            {
+                "id": p.id,
+                "brand": p.brand,
+                "model": p.model,
+                "category": p.category.name if getattr(p, "category", None) else "",
+                "createdAt": p.created_at.isoformat() if p.created_at else "",
+                "reviewsCount": reviews_count,
+                "affiliateLinksCount": affiliate_links_count,
+            }
+        )
+
+    # ---- Top kategoriler ----
+    top_categories = []
+    for c in Category.objects.all():
+        articles_count = Article.objects.filter(
+            category=c, status="PUBLISHED"
+        ).count()
+        products_count = Product.objects.filter(category=c).count()
+        total_content = articles_count + products_count
+        top_categories.append(
+            {
+                "id": c.id,
+                "name": c.name,
+                "slug": c.slug,
+                "articlesCount": articles_count,
+                "productsCount": products_count,
+                "totalContent": total_content,
+            }
+        )
+
+    # totalContent’e göre sırala
+    top_categories.sort(key=lambda x: x["totalContent"], reverse=True)
+
+    # ---- Affiliate merchant istatistikleri ----
+    merchants = (
+        AffiliateLink.objects.values("merchant")
+        .annotate(links_count=Count("id"))
+        .order_by("-links_count")[:10]
+    )
+    affiliate_merchants = [
+        {"name": m["merchant"], "linksCount": m["links_count"]}
+        for m in merchants
+    ]
+
+    data = {
+        "overview": {
+            "totalArticles": total_articles,
+            "totalProducts": total_products,
+            "totalUsers": total_users,
+            "totalReviews": total_reviews,
+            "totalAffiliateLinks": total_affiliate_links,
+            "totalComments": total_comments,
+            "avgReviewsPerProduct": avg_reviews_per_product,
+            "avgCommentsPerArticle": avg_comments_per_article,
+        },
+        "recentContent": {
+            "articles": recent_articles,
+            "products": recent_products,
+        },
+        "topCategories": top_categories,
+        "affiliateMerchants": affiliate_merchants,
+    }
+
+    return Response({"success": True, "data": data})
+
 
 
 # Outbound Click Tracking
@@ -1562,6 +1768,7 @@ def settings_bulk_view(request):
                     grouped_settings[category][key] = default_data
 
         return Response({"success": True, "data": grouped_settings})
+        
 
     # ---------- POST (bulk update) ----------
     from django.core.files.storage import default_storage
@@ -2095,61 +2302,3 @@ class ProductReviewsBySlugView(generics.ListCreateAPIView):
             traceback.print_exc()
             return Response({'error': f'Error creating review: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
-
-# Database Statistics View
-class DatabaseStatsView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-    
-    def get(self, request):
-        try:
-            # Check if user is admin or super admin
-            if not hasattr(request.user, 'role') or request.user.role not in ['ADMIN', 'SUPER_ADMIN']:
-                return Response({'error': 'Admin or Super Admin access required'}, status=status.HTTP_403_FORBIDDEN)
-            
-            from django.db import connection
-            from django.apps import apps
-            
-            # Get all models from main app
-            models = apps.get_app_config('main').get_models()
-            
-            stats = []
-            
-            for model in models:
-                try:
-                    count = model.objects.count()
-                    stats.append({
-                        'name': model.__name__,
-                        'count': count,
-                        'table_name': model._meta.db_table
-                    })
-                except Exception as e:
-                    print(f"Error counting {model.__name__}: {e}")
-                    stats.append({
-                        'name': model.__name__,
-                        'count': 0,
-                        'table_name': model._meta.db_table,
-                        'error': str(e)
-                    })
-            
-            # Get database info
-            with connection.cursor() as cursor:
-                cursor.execute("SELECT version();")
-                db_version = cursor.fetchone()[0]
-                
-                cursor.execute("SELECT pg_database_size(current_database());")
-                db_size = cursor.fetchone()[0]
-            
-            return Response({
-                'success': True,
-                'tables': stats,
-                'database_info': {
-                    'version': db_version,
-                    'size_bytes': db_size,
-                    'size_mb': round(db_size / (1024 * 1024), 2)
-                }
-            })
-            
-        except Exception as e:
-            print(f"Error getting database stats: {e}")
-            return Response({'error': f'Error getting database stats: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            

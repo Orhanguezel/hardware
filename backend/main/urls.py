@@ -1,9 +1,13 @@
+# hardware/backend/main/urls.py
+
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import views
 from . import newsletter_views
 from . import password_reset_views
-from . import email_test_views 
+from . import email_test_views
+from .analytics_view import admin_dashboard_view 
+
 
 # Create router for ViewSets (if needed in future)
 router = DefaultRouter()
@@ -86,8 +90,11 @@ urlpatterns = [
     path('affiliate-links/', views.AffiliateLinkListView.as_view(), name='affiliate-link-list'),
     path('affiliate-links/<int:pk>/', views.AffiliateLinkDetailView.as_view(), name='affiliate-link-detail'),
     
-    # Analytics
-    path('analytics/', views.analytics_view, name='analytics'),
+    # Admin Analytics & Dashboard (ADMIN API)
+    path('analytics/', views.analytics_view, name='admin-analytics'),
+    path('analytics/monthly/', views.monthly_analytics_view, name='admin-monthly-analytics'),
+    path('database/stats/', views.DatabaseStatsView.as_view(), name='admin-database-stats'),
+    path('dashboard/', admin_dashboard_view, name='admin-dashboard'),
     
     # Outbound Click Tracking
     path('outbound/', views.track_outbound_click, name='outbound-click'),
@@ -95,11 +102,7 @@ urlpatterns = [
     # Article View Tracking
     path('article-view/', views.track_article_view, name='article-view'),
     
-    # Monthly Analytics
-    path('analytics/monthly/', views.monthly_analytics_view, name='monthly-analytics'),
     
-    # Database Statistics
-    path('database/stats/', views.DatabaseStatsView.as_view(), name='database-stats'),
     
     # Newsletter
     path('newsletter/subscribe/', newsletter_views.newsletter_subscribe_view, name='newsletter-subscribe'),
