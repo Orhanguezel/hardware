@@ -684,10 +684,14 @@ class ProductSerializer(serializers.ModelSerializer):
 
 
 class ArticleSerializer(serializers.ModelSerializer):
+    # 🔹 Slug artık sadece read-only (otomatik üretilecek)
+    slug = serializers.SlugField(read_only=True)
+
     content = serializers.CharField()
     author = UserSerializer(read_only=True)
     category = CategorySerializer(read_only=True)
     category_id = serializers.IntegerField(write_only=True, required=False)
+
     article_tags = serializers.SerializerMethodField()
     review_extra = serializers.SerializerMethodField()
     review_extra_data = serializers.JSONField(write_only=True, required=False)
@@ -695,14 +699,18 @@ class ArticleSerializer(serializers.ModelSerializer):
     best_list_extra_data = serializers.JSONField(write_only=True, required=False)
     compare_extra = serializers.SerializerMethodField()
     comment_count = serializers.SerializerMethodField()
+
     hero_image_file = serializers.ImageField(write_only=True, required=False)
+
+    # 🔹 write-only tags alanı (modelde yok)
+    tags = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     class Meta:
         model = Article
         fields = [
             "id",
             "type",
-            "slug",
+            "slug",              # read_only
             "title",
             "subtitle",
             "excerpt",
@@ -726,8 +734,9 @@ class ArticleSerializer(serializers.ModelSerializer):
             "compare_extra",
             "comment_count",
             "created_at",
+            "tags",
         ]
-        read_only_fields = ["id", "created_at"]
+        read_only_fields = ["id", "created_at", "slug"]
 
     def create(self, validated_data):
         category_id = validated_data.pop("category_id", None)
@@ -738,6 +747,7 @@ class ArticleSerializer(serializers.ModelSerializer):
         if hero_image_file:
             validated_data["hero_image"] = hero_image_file
 
+        # slug otomatik üret
         if "title" in validated_data:
             import re
 
@@ -752,8 +762,10 @@ class ArticleSerializer(serializers.ModelSerializer):
                 counter += 1
             validated_data["slug"] = slug
 
+        # modelde olmayan alanları at
         validated_data.pop("review_extra_data", None)
         validated_data.pop("best_list_extra_data", None)
+        validated_data.pop("tags", None)
 
         return super().create(validated_data)
 
@@ -769,6 +781,7 @@ class ArticleSerializer(serializers.ModelSerializer):
         if "hero_image" in validated_data and validated_data["hero_image"] == "":
             validated_data["hero_image"] = None
 
+        # title değiştiyse slug yeniden üret
         if "title" in validated_data and validated_data["title"] != instance.title:
             import re
 
@@ -785,6 +798,7 @@ class ArticleSerializer(serializers.ModelSerializer):
 
         validated_data.pop("review_extra_data", None)
         validated_data.pop("best_list_extra_data", None)
+        validated_data.pop("tags", None)
 
         return super().update(instance, validated_data)
 
@@ -834,11 +848,11 @@ class ArticleSerializer(serializers.ModelSerializer):
                     obj.compare_extra.right_product
                 ).data,
                 "rounds": obj.compare_extra.rounds,
-                "winner_product": ProductSerializer(
-                    obj.compare_extra.winner_product
-                ).data
-                if obj.compare_extra.winner_product
-                else None,
+                "winner_product": (
+                    ProductSerializer(obj.compare_extra.winner_product).data
+                    if obj.compare_extra.winner_product
+                    else None
+                ),
             }
         return None
 
