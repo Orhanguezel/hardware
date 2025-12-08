@@ -5,12 +5,16 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
-import { Providers } from "./providers"; 
+import { Providers } from "./providers";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { DynamicFavicon } from "@/components/DynamicFavicon";
 import { DynamicSEO } from "@/components/DynamicSEO";
 import { Toaster } from "sonner";
+
+// 🔥 Tüm app'i dinamik yap – DYNAMIC_SERVER_USAGE derdini kökten kesiyoruz
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -49,7 +53,6 @@ export const metadata: Metadata = {
       "En güncel donanım incelemeleri, karşılaştırmaları ve rehberleri. Router, modem, ağ ekipmanları hakkında detaylı analizler.",
     images: [
       {
-        // public/og-image.jpg dosyasına karşılık gelir
         url: "/og-image.jpg",
         width: 1200,
         height: 630,
@@ -67,7 +70,6 @@ export const metadata: Metadata = {
   },
 
   verification: {
-    // Buraya gerçek Search Console code’unu koyman lazım
     google: "your-google-verification-code",
   },
 };
@@ -83,7 +85,7 @@ export default function RootLayout({
         <Providers>
           <DynamicFavicon />
           <DynamicSEO />
-          <div className="min-h-screen flex flex-col">
+          <div className="flex min-h-screen flex-col">
             <Header />
             <main className="flex-1">{children}</main>
             <Footer />

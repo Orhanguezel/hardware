@@ -1,19 +1,23 @@
+// =============================================================
+// FILE: src/app/reviews/[slug]/page.tsx
+// =============================================================
 
-// src/app/reviews/[slug]/page.tsx
+import type { Metadata } from "next";
+import type { ArticleDto } from "@/integrations/hardware/rtk/types/article.types";
+import ReviewPageClient from "./ReviewPageClient";
+import { DJANGO_API_URL_BROWSER } from "@/lib/api-config";
 
-import type { Metadata } from 'next';
-import type { ArticleDto } from '@/integrations/hardware/rtk/types/article.types';
-import ReviewPageClient from './ReviewPageClient';
-import { DJANGO_API_URL_BROWSER } from '@/lib/api-config';
+const API_BASE = DJANGO_API_URL_BROWSER.replace(/\/+$/, "");
 
-const API_BASE = DJANGO_API_URL_BROWSER.replace(/\/+$/, '');
+// Bu route dinamik; dış API'ye no-store fetch yaptığımız için:
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
-// Next 15 pattern: params/searchParams Promise
+// Next'in PageProps constraint problemi için params'ı Promise olarak tipliyoruz.
+// Bu tip sadece bu dosyada kullanılıyor, export edilmiyor.
 type ReviewPageProps = {
-  params: Promise<{ slug: string }>;
-  // searchParams'u kullanmıyoruz ama PageProps constraint'i ile uyumlu kalsın
-  searchParams?: Promise<{
-    [key: string]: string | string[] | undefined;
+  params: Promise<{
+    slug: string;
   }>;
 };
 
@@ -24,7 +28,7 @@ async function fetchReviewForMeta(slug: string): Promise<ArticleDto | null> {
     const res = await fetch(
       `${API_BASE}/articles/${encodeURIComponent(slug)}/`,
       {
-        cache: 'no-store',
+        cache: "no-store",
       },
     );
 
@@ -32,13 +36,13 @@ async function fetchReviewForMeta(slug: string): Promise<ArticleDto | null> {
 
     const data = (await res.json()) as ArticleDto;
 
-    if (data.type !== 'REVIEW' || data.status !== 'PUBLISHED') {
+    if (data.type !== "REVIEW" || data.status !== "PUBLISHED") {
       return null;
     }
 
     return data;
   } catch (err) {
-    console.error('Error fetching review for metadata:', err);
+    console.error("Error fetching review for metadata:", err);
     return null;
   }
 }
@@ -50,8 +54,8 @@ export async function generateMetadata(
 
   if (!slug) {
     return {
-      title: 'İnceleme Bulunamadı',
-      description: 'Aradığınız inceleme bulunamadı.',
+      title: "İnceleme Bulunamadı",
+      description: "Aradığınız inceleme bulunamadı.",
     };
   }
 
@@ -59,8 +63,8 @@ export async function generateMetadata(
 
   if (!review) {
     return {
-      title: 'İnceleme Bulunamadı',
-      description: 'Aradığınız inceleme bulunamadı.',
+      title: "İnceleme Bulunamadı",
+      description: "Aradığınız inceleme bulunamadı.",
     };
   }
 
@@ -80,6 +84,5 @@ export async function generateMetadata(
 
 export default async function Page({ params }: ReviewPageProps) {
   const { slug } = await params;
-
   return <ReviewPageClient slug={slug} />;
 }
