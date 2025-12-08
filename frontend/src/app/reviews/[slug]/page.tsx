@@ -1,3 +1,4 @@
+
 // src/app/reviews/[slug]/page.tsx
 
 import type { Metadata } from 'next';
@@ -6,6 +7,15 @@ import ReviewPageClient from './ReviewPageClient';
 import { DJANGO_API_URL_BROWSER } from '@/lib/api-config';
 
 const API_BASE = DJANGO_API_URL_BROWSER.replace(/\/+$/, '');
+
+// Next 15 pattern: params/searchParams Promise
+type ReviewPageProps = {
+  params: Promise<{ slug: string }>;
+  // searchParams'u kullanmıyoruz ama PageProps constraint'i ile uyumlu kalsın
+  searchParams?: Promise<{
+    [key: string]: string | string[] | undefined;
+  }>;
+};
 
 async function fetchReviewForMeta(slug: string): Promise<ArticleDto | null> {
   if (!slug) return null;
@@ -33,16 +43,10 @@ async function fetchReviewForMeta(slug: string): Promise<ArticleDto | null> {
   }
 }
 
-interface ReviewPageParams {
-  params: {
-    slug: string;
-  };
-}
-
 export async function generateMetadata(
-  { params }: ReviewPageParams,
+  { params }: ReviewPageProps,
 ): Promise<Metadata> {
-  const slug = params.slug;
+  const { slug } = await params;
 
   if (!slug) {
     return {
@@ -74,8 +78,8 @@ export async function generateMetadata(
   };
 }
 
-export default function Page({ params }: ReviewPageParams) {
-  const slug = params.slug;
+export default async function Page({ params }: ReviewPageProps) {
+  const { slug } = await params;
 
   return <ReviewPageClient slug={slug} />;
 }
