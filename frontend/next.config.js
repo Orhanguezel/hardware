@@ -1,41 +1,38 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  serverExternalPackages: ['@prisma/client'],
+  // Prisma gibi native modülleri server tarafında external bırak
+  serverExternalPackages: ["@prisma/client"],
 
   images: {
-    // domains yerine remotePatterns kullan
+    // Next 13+ için doğru kullanım: remotePatterns
     remotePatterns: [
       {
-        protocol: 'http',
-        hostname: 'localhost',
+        protocol: "http",
+        hostname: "localhost",
       },
       {
-        protocol: 'https',
-        hostname: 'images.unsplash.com',
+        protocol: "https",
+        hostname: "images.unsplash.com",
       },
     ],
-    formats: ['image/webp', 'image/avif'],
+    formats: ["image/webp", "image/avif"],
   },
 
   async rewrites() {
     return [
       {
-        source: '/sitemap.xml',
-        destination: '/api/sitemaps',
+        source: "/sitemap.xml",
+        destination: "/api/sitemaps",
       },
     ];
   },
 
-  // 🔧 ESLint hataları build’i kırmasın
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-
-  // Webpack infra log gürültüsünü azalt
+  // 🔧 Webpack infra log gürültüsünü azalt
+  //   (Sadece `--webpack` ile build/development çalıştırdığında devreye girer)
   webpack: (config) => {
     config.infrastructureLogging = {
       ...(config.infrastructureLogging || {}),
-      level: 'error', // warning'leri gösterme
+      level: "error", // warning'leri gösterme
     };
     return config;
   },
