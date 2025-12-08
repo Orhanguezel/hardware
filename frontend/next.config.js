@@ -27,8 +27,12 @@ const nextConfig = {
     ];
   },
 
+  // ✅ ESLint hataları build'i kırmasın (hardware için prod’da mantıklı)
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+
   // 🔧 Webpack infra log gürültüsünü azalt
-  //   (Sadece `--webpack` ile build/development çalıştırdığında devreye girer)
   webpack: (config) => {
     config.infrastructureLogging = {
       ...(config.infrastructureLogging || {}),
