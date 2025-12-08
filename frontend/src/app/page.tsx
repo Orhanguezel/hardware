@@ -1,3 +1,5 @@
+// src/app/page.tsx
+
 // =============================================================
 // FILE: src/app/page.tsx
 // =============================================================
@@ -7,7 +9,10 @@ import { FeaturedReviews } from "@/components/sections/featured-reviews";
 import { LatestArticles } from "@/components/sections/latest-articles";
 import { NewsletterSignup } from "@/components/sections/newsletter-signup";
 
-export default async function HomePage() {
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
+export default function HomePage() {
   return (
     <div className="flex flex-col">
       <div className="animate-fade-in">
