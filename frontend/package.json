@@ -4,8 +4,8 @@
   "private": true,
   "_madeBy": "byiyuel",
   "scripts": {
-    "dev": "next dev --port 3001 --webpack",
-    "build": "next build --webpack",
+    "dev": "next dev --port 3001",
+    "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "backend:dev": "cd backend && python manage.py runserver 8000",
