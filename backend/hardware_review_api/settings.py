@@ -18,18 +18,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Security / Debug
 # =========================
 
-# SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = config(
     "SECRET_KEY",
     default="django-insecure-8wey8vakag@ozp^+9dg)c9^l7omyycyg#1dk8n7z(0_216fm=7",
 )
 
-# Prod için default'u False yapalım, .env ile override edilir
+# Prod için default False, .env ile override edilir
 DEBUG = config("DEBUG", default=False, cast=bool)
 
 ALLOWED_HOSTS = config(
     "ALLOWED_HOSTS",
-    # Prod için domainleri de default’a ekleyelim
     default="localhost,127.0.0.1,donanimpuani.com,www.donanimpuani.com",
     cast=lambda v: [s.strip() for s in v.split(",")],
 )
@@ -91,7 +89,6 @@ DATABASES = {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": config("DB_NAME", default="hardware_db"),
         "USER": config("DB_USER", default="hardware_user"),
-        # Default'u da .env ile uyumlu tutuyoruz
         "PASSWORD": config("DB_PASSWORD", default="PgAdmin2025!"),
         "HOST": config("DB_HOST", default="localhost"),
         "PORT": config("DB_PORT", default="5432"),
@@ -135,10 +132,8 @@ STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Custom User Model
 AUTH_USER_MODEL = "main.User"
 
-# Media files
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
@@ -200,7 +195,7 @@ EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
 EMAIL_USE_SSL = config("EMAIL_USE_SSL", default=False, cast=bool)
 EMAIL_HOST_USER = config(
     "EMAIL_HOST_USER",
-    default="info@xn--donanmpuan-1ubf.com",  # Punycode domain
+    default="info@xn--donanmpuan-1ubf.com",
 )
 EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="CHANGE_ME")
 EMAIL_TIMEOUT = config("EMAIL_TIMEOUT", default=30, cast=int)
