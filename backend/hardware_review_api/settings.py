@@ -24,8 +24,8 @@ SECRET_KEY = config(
     default="django-insecure-8wey8vakag@ozp^+9dg)c9^l7omyycyg#1dk8n7z(0_216fm=7",
 )
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config("DEBUG", default=True, cast=bool)
+# Prod için default'u False yapalım, .env ile override edilir
+DEBUG = config("DEBUG", default=False, cast=bool)
 
 ALLOWED_HOSTS = config(
     "ALLOWED_HOSTS",
@@ -89,11 +89,12 @@ WSGI_APPLICATION = "hardware_review_api.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": "hardware_db",
-        "USER": "hardware_user",
-        "PASSWORD": "PgAdmin2025!",
-        "HOST": "localhost",
-        "PORT": "5432",
+        "NAME": config("DB_NAME", default="hardware_db"),
+        "USER": config("DB_USER", default="hardware_user"),
+        # Default'u da .env ile uyumlu tutuyoruz
+        "PASSWORD": config("DB_PASSWORD", default="PgAdmin2025!"),
+        "HOST": config("DB_HOST", default="localhost"),
+        "PORT": config("DB_PORT", default="5432"),
     }
 }
 
